@@ -1,2 +1,2 @@
 # SpendGPT
-An AI-powered personal finance copilot for students. Automatically categorizes spending using local ML, detects unusual transaction spikes, and provides natural-language financial insights via a local LLM. Built with FastAPI, PostgreSQL, and Alembic.
+A personal-finance copilot for students: it categorises your spending with a locally trained model, flags unusual transactions before they hurt, and answers plain-English questions about your money through a local LLM.. Built with FastAPI, MySQL, and React.
