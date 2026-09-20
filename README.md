@@ -1,2 +1,2 @@
 # SpendGPT
-A personal-finance copilot for students: it categorises your spending with a locally trained model, flags unusual transactions before they hurt, and answers plain-English questions about your money through a local LLM.. Built with FastAPI, MySQL, and React.
+An AI-powered student finance copilot featuring local ML transaction categorization, anomaly detection, and a local LLM (Ollama) for conversational money insights. Fully stack-implemented using React, FastAPI, MySQL, and layered architecture.
