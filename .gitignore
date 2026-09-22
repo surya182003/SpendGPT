@@ -1,0 +1,24 @@
+# Environment files & Secrets
+.env
+*.env
+.env.local
+
+# Python / FastAPI / Local ML
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+
+# React / Node
+node_modules/
+/build
+/dist
+.DS_Store
+
+# Database & IDE
+*.sqlite3
+.vscode/
+.idea/
