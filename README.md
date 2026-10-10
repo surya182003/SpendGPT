@@ -1,16 +1,9 @@
-# React + Vite
+# SpendGPT
+An AI-powered student finance copilot featuring local ML transaction categorization, anomaly detection, and a local LLM (Ollama) for conversational money insights. Fully stack-implemented using React, FastAPI, MySQL, and layered architecture.
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+SpendGPT– AI Student Finance Copilot | React, FastAPI, MySQL, Local LLM (Ollama)
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+* Building a full-stack finance copilot with a React frontend and FastAPI backend, using a layered architecture with
+  MySQL for persistence.
+* Implementing local ML models for automatic transaction categorisation and anomaly detection, paired with a
+  local LLM (Ollama) for conversational money insight
