@@ -209,7 +209,7 @@ DISCOUNT_LABEL_RE = re.compile(
 
 CODE_ONLY_RE = re.compile(r"^\d{4,14}$")
 # Code followed by a description, which may itself start with a digit
-# ("275578 6PK TOMATOES").
+# ("275578 6PK TOMATOES"). this is product code followed by a description, which may itself start with a digit
 CODE_PREFIX_RE = re.compile(r"^(\d{4,14})\s+(.*[A-Za-z].*)$")
 
 # "2 x 1.29" or "2 @ 1.29" on its own line, before the line total.
@@ -306,7 +306,6 @@ def extract_items(lines):
         if NOISE_RE.search(line):
             continue
 
-        # Quantity lines are consumed together with their price line.
         if QTY_RE.match(line):
             continue
 
@@ -657,3 +656,7 @@ def parse_receipt_text(raw_text):
         "discounts": [float(value) for value in discounts],
         "raw_ocr_text": raw_text,
     }
+
+# the vat has been extracted from the receipt and is included in the result dictionary under the key "tax_amount". The value is a float representing the total VAT amount found on the receipt. If no VAT amount is found, this key will have a value of None.
+# some receipts may not have a VAT amount, in which case the "tax_amount" key will be None.
+# having trouble with the vat extraction, you can check the "raw_ocr_text" key in the result dictionary to see the original OCR text and verify if the VAT amount is present and correctly formatted.
