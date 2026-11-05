@@ -1,8 +1,19 @@
-"""Line-item extraction ."""
+"""
+-- References and Acknowledgements -- (added as suggested by professor)
+
+The implementation of the rule-based receipt parsing component was informed by the open-source project [Spesa](https://github.com/humanitiesNerd/spesa). 
+Its approach to deterministic receipt parsing, particularly the extraction of product descriptions, quantities, unit prices, totals (might have missed a few other things too),
+was useful as a reference when designing the line-item extraction logic for SpendGPT. 
+The SpendGPT implementation was developed and adapted to its own requirements and receipt formats.
+
+"""
+
+"""Line-item extraction (product section only)."""
 import re
 from decimal import Decimal
-from money import parse_money
-from patterns import AMT, CUR, MONEY_RE, SIGNED_AMT
+
+from .money import parse_money
+from .patterns import AMT, CUR, MONEY_RE, SIGNED_AMT
 
 NON_ITEM_LABELS = {
     "total", "subtotal", "grand total", "total savings", "savings",
@@ -10,6 +21,7 @@ NON_ITEM_LABELS = {
     "approved", "contactless", "customer copy", "vat", "tax", "eur",
 }
 
+# The first of these marks the end of the product section.
 END_RE = re.compile(
     r"^(?:sub\s*-?total|grand\s+total|total|goods|card\s+sales?|"
     r"(?:credit|debit)\s+card|amount\s+due|balance\s+due|payment|"
@@ -17,6 +29,8 @@ END_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Header/column lines that sit just before the first product : the header lines I have seen are "EUR", "Euro", "Description", "Item", "Items", "Qty", "Quantity", "Price" and "Amount"
+#add any more header lines you have seen to this regex if you have seen any other header lines in receipts
 START_RE = re.compile(
     r"^(?:eur|euro|description|item|items|qty|quantity|price|amount)$",
     re.IGNORECASE,
@@ -38,9 +52,13 @@ DISCOUNT_LABEL_RE = re.compile(
     re.IGNORECASE,
 )
 
+CODE_ONLY_RE = re.compile(r"^\d{4,14}$")
 
+# Product code followed by a description, which may itself start with a
+# digit ("275578 6PK TOMATOES").
 CODE_PREFIX_RE = re.compile(r"^(\d{4,14})\s+(.*[A-Za-z].*)$")
 
+# "2 x 1.29" or "2 @ 1.29" on its own line, before the line total.
 QTY_RE = re.compile(
     rf"^(?P<qty>\d+(?:[.,]\d+)?)\s*[x@*×]\s*(?:{CUR}\s*)?(?P<unit>{AMT})$",
     re.IGNORECASE,
@@ -48,6 +66,7 @@ QTY_RE = re.compile(
 
 # "Red Onions 0.99 A" / "5012345678900 Red Onions 0.99" on one line.
 ITEM_LINE_RE = re.compile(
+    rf"^(?:\d{{4,14}}\s+)?(?P<name>.*[A-Za-z].*?)\s+"
     rf"(?:{CUR}\s*)?(?P<price>{SIGNED_AMT})(?:\s*{CUR})?(?:\s+[A-Z])?$",
     re.IGNORECASE,
 )
@@ -90,10 +109,9 @@ def _is_valid_description(text):
     )
 
 
-def _new_item(name, code, quantity, unit_price, gross):
+def _new_item(name, quantity, unit_price, gross):
     return {
         "item_name": name,
-        "product_code": code,
         "quantity": quantity,
         "unit_price": unit_price,
         "discount": Decimal("0.00"),
@@ -125,18 +143,19 @@ def _item_from_price_line(lines, index, start, amount):
         unit_price = parse_money(qty_match.group("unit"))
         j -= 1
 
-    code = None
+    had_code_line = False
 
     if j >= start and CODE_ONLY_RE.match(lines[j]):
-        code = lines[j]
+        had_code_line = True
         j -= 1
 
     description = lines[j].strip() if j >= start else ""
 
-    prefix = CODE_PREFIX_RE.match(description)
+    if not had_code_line:
+        prefix = CODE_PREFIX_RE.match(description)
 
-    if prefix and code is None:
-        code, description = prefix.group(1), prefix.group(2)
+        if prefix:
+            description = prefix.group(2)
     if quantity == Decimal("1.000") and j - 1 >= start:
         before = QTY_RE.match(lines[j - 1])
 
@@ -150,7 +169,7 @@ def _item_from_price_line(lines, index, start, amount):
     if not _is_valid_description(description):
         return None
 
-    return _new_item(description, code, quantity, unit_price, amount)
+    return _new_item(description, quantity, unit_price, amount)
 
 
 def extract_items(lines):
@@ -203,7 +222,6 @@ def extract_items(lines):
 
             item = _new_item(
                 single.group("name").strip(),
-                single.group("code"),
                 Decimal("1.000"),
                 amount,
                 amount,

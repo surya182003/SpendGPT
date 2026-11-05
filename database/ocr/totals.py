@@ -1,3 +1,12 @@
+"""
+References and Acknowledgements
+
+The receipt-total extraction component was developed with reference to the open-source project [Spesa](https://github.com/humanitiesNerd/spesa).
+Its approach to deterministic receipt parsing and reconciliation of extracted line item amounts with the printed receipt total provided useful guidance.
+SpendGPT implements its own total-selection logic, using labelled amount candidates, priority-based scoring, agreement between candidates, and comparison against the sum of extracted line items.
+
+"""
+
 """Receipt total extraction."""
 import re
 from decimal import Decimal
