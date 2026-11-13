@@ -24,10 +24,18 @@ conn = mysql.connector.connect(
 
 cur = conn.cursor()
 cur.execute("SELECT category_id, category_name, spend_type FROM categories")
+categories = cur.fetchall()
 
 print("Connected! Categories in the database:")
-for category_id, name, spend_type in cur.fetchall():
+for category_id, name, spend_type in categories:
     print(f"{category_id}: {name} ({spend_type})")
+
+cur.execute("SELECT * FROM users")
+users = cur.fetchall()
+
+print("first 5 users in the database:")
+for user in users[:5]:
+    print(user)
 
 cur.close()
 conn.close()
