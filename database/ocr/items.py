@@ -12,8 +12,8 @@ The SpendGPT implementation was developed and adapted to its own requirements an
 import re
 from decimal import Decimal
 
-from .money import parse_money
-from .patterns import AMT, CUR, MONEY_RE, SIGNED_AMT
+from money import parse_money
+from patterns import AMT, CUR, MONEY_RE, SIGNED_AMT
 
 NON_ITEM_LABELS = {
     "total", "subtotal", "grand total", "total savings", "savings",
