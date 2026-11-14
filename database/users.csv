@@ -1,0 +1,6 @@
+user_id,first_name,last_name,email,password_hash,base_currency,monthly_income,savings_goal,created_at
+1,Kesav,pillai,Kesav.pillai@seed.spendgpt.dev,$2a$12$6t1XgP8gSlnhssmIfq7s.ukUh2oJfWtchofrYMIi1Ffi0hFEC5n7m,EUR,1150,100,02-05-2026 09:00
+2,sasirudh,balaji,sasirudh.balaji@seed.spendgpt.dev,$2a$12$6t1XgP8gSlnhssmIfq7s.ukUh2oJfWtchofrYMIi1Ffi0hFEC5n7m,EUR,1300,200,02-05-2026 09:00
+3,surya,prakash,surya.prakash@seed.spendgpt.dev,$2a$12$6t1XgP8gSlnhssmIfq7s.ukUh2oJfWtchofrYMIi1Ffi0hFEC5n7m,EUR,950,50,02-05-2026 09:00
+4,vishi,iyer,vishi.iyer@seed.spendgpt.dev,$2a$12$6t1XgP8gSlnhssmIfq7s.ukUh2oJfWtchofrYMIi1Ffi0hFEC5n7m,EUR,1400,250,02-05-2026 09:00
+5,abcd,edfg,abcd.edfg@seed.spendgpt.dev,$2a$12$6t1XgP8gSlnhssmIfq7s.ukUh2oJfWtchofrYMIi1Ffi0hFEC5n7m,EUR,1050,150,02-05-2026 09:00
