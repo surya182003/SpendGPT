@@ -14,7 +14,7 @@ class Transaction(Base):
 
     transaction_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
-    category_id: Mapped[int | None] = mapped_column(nullable=True)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.category_id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     merchant_name: Mapped[str] = mapped_column(String(100), nullable=False)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
