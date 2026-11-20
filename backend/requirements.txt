@@ -4,3 +4,5 @@ sqlalchemy
 pymysql
 bcrypt
 email-validator
+python-multipart
+indra-ocr==1.1.2
