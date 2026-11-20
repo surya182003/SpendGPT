@@ -19,8 +19,8 @@ class Budget(Base):
 
     budget_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"),nullable=False)
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.category_id", ondelete="SET NULL"),nullable=True)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.category_id", ondelete="RESTRICT"),nullable=True)
     amount_limit: Mapped[Decimal] = mapped_column(Numeric(10, 2),nullable=False)
     start_date: Mapped[date] = mapped_column(Date,nullable=False)
     end_date: Mapped[date] = mapped_column(Date,nullable=False)
-    created_at: Mapped[datetime | None] = mapped_column(TIMESTAMP,server_default=func.current_timestamp(),nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP,server_default=func.current_timestamp(),nullable=False)
