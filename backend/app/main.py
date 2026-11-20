@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import CORS_ORIGINS
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.category_controller import router as category_router
+from app.controllers.transaction_controller import router as transaction_router
 from app.database import Base, engine
 
 from app.models.user import User
 from app.models.category import Category
+from app.models.transaction import Transaction
 
 
 @asynccontextmanager
@@ -27,6 +29,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(category_router)
+app.include_router(transaction_router)
 
 
 @app.get("/health")
