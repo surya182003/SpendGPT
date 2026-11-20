@@ -1,0 +1,11 @@
+account_id,user_id,account_name,account_type,current_balance
+1,1,Main Current Account,Current,1543.4
+2,1,Savings Pot,Savings,608.29
+3,2,Main Current Account,Current,595.42
+4,2,Savings Pot,Savings,589.51
+5,3,Main Current Account,Current,311.68
+6,3,Savings Pot,Savings,1779.1
+7,4,Main Current Account,Current,532.86
+8,4,Savings Pot,Savings,1471.54
+9,5,Main Current Account,Current,1233.54
+10,5,Savings Pot,Savings,1648.53

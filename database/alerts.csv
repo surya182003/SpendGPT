@@ -1,0 +1,110 @@
+alert_id,user_id,alert_type,message,is_read,related_transaction_id,related_budget_id,created_at
+1,1,budget_exceeded,You've spent EUR 272.81 of your EUR 220 Groceries budget for June 2026 (124%).,TRUE,,1,30-06-2026 18:00
+2,1,budget_exceeded,You've spent EUR 223.00 of your EUR 50 Entertainment budget for June 2026 (446%).,TRUE,,5,30-06-2026 18:00
+3,1,budget_exceeded,You've spent EUR 324.11 of your EUR 220 Groceries budget for July 2026 (147%).,TRUE,,6,31-07-2026 18:00
+4,1,budget_exceeded,You've spent EUR 92.05 of your EUR 80 Eating Out budget for July 2026 (115%).,TRUE,,7,31-07-2026 18:00
+5,1,budget_exceeded,You've spent EUR 128.89 of your EUR 100 Shopping budget for July 2026 (129%).,TRUE,,8,31-07-2026 18:00
+6,1,budget_exceeded,You've spent EUR 72.55 of your EUR 60 Transport budget for July 2026 (121%).,TRUE,,9,31-07-2026 18:00
+7,1,budget_exceeded,You've spent EUR 157.18 of your EUR 50 Entertainment budget for July 2026 (314%).,TRUE,,10,31-07-2026 18:00
+8,1,budget_exceeded,You've spent EUR 302.08 of your EUR 220 Groceries budget for August 2026 (137%).,TRUE,,11,31-08-2026 18:00
+9,1,budget_exceeded,You've spent EUR 137.07 of your EUR 80 Eating Out budget for August 2026 (171%).,TRUE,,12,31-08-2026 18:00
+10,1,budget_warning,You've spent EUR 41.26 of your EUR 50 Entertainment budget for August 2026 (83%).,TRUE,,15,31-08-2026 18:00
+11,1,budget_exceeded,You've spent EUR 223.55 of your EUR 220 Groceries budget for September 2026 (102%).,TRUE,,16,30-09-2026 18:00
+12,1,budget_exceeded,You've spent EUR 110.46 of your EUR 80 Eating Out budget for September 2026 (138%).,TRUE,,17,30-09-2026 18:00
+13,1,budget_exceeded,You've spent EUR 105.65 of your EUR 100 Shopping budget for September 2026 (106%).,TRUE,,18,30-09-2026 18:00
+14,1,budget_exceeded,You've spent EUR 118.75 of your EUR 60 Transport budget for September 2026 (198%).,TRUE,,19,30-09-2026 18:00
+15,1,budget_exceeded,You've spent EUR 126.94 of your EUR 50 Entertainment budget for September 2026 (254%).,TRUE,,20,30-09-2026 18:00
+16,1,budget_exceeded,You've spent EUR 226.42 of your EUR 220 Groceries budget for October 2026 (103%).,TRUE,,21,31-10-2026 18:00
+17,1,budget_exceeded,You've spent EUR 142.19 of your EUR 80 Eating Out budget for October 2026 (178%).,TRUE,,22,31-10-2026 18:00
+18,1,budget_exceeded,You've spent EUR 121.73 of your EUR 60 Transport budget for October 2026 (203%).,TRUE,,24,31-10-2026 18:00
+19,1,budget_warning,You've spent EUR 40.80 of your EUR 50 Entertainment budget for November 2026 (82%).,FALSE,,30,13-11-2026 18:00
+20,2,budget_warning,You've spent EUR 161.54 of your EUR 200 Groceries budget for June 2026 (81%).,TRUE,,31,30-06-2026 18:00
+21,2,budget_exceeded,You've spent EUR 199.28 of your EUR 120 Eating Out budget for June 2026 (166%).,TRUE,,32,30-06-2026 18:00
+22,2,budget_exceeded,You've spent EUR 93.52 of your EUR 80 Shopping budget for June 2026 (117%).,TRUE,,33,30-06-2026 18:00
+23,2,budget_exceeded,You've spent EUR 121.30 of your EUR 50 Transport budget for June 2026 (243%).,TRUE,,34,30-06-2026 18:00
+24,2,budget_exceeded,You've spent EUR 122.98 of your EUR 120 Eating Out budget for July 2026 (102%).,TRUE,,37,31-07-2026 18:00
+25,2,budget_warning,You've spent EUR 68.10 of your EUR 80 Shopping budget for July 2026 (85%).,TRUE,,38,31-07-2026 18:00
+26,2,budget_exceeded,You've spent EUR 71.72 of your EUR 50 Transport budget for July 2026 (143%).,TRUE,,39,31-07-2026 18:00
+27,2,budget_exceeded,You've spent EUR 210.16 of your EUR 60 Entertainment budget for July 2026 (350%).,TRUE,,40,31-07-2026 18:00
+28,2,budget_warning,You've spent EUR 161.29 of your EUR 200 Groceries budget for August 2026 (81%).,TRUE,,41,31-08-2026 18:00
+29,2,budget_exceeded,You've spent EUR 181.06 of your EUR 120 Eating Out budget for August 2026 (151%).,TRUE,,42,31-08-2026 18:00
+30,2,budget_exceeded,You've spent EUR 92.28 of your EUR 80 Shopping budget for August 2026 (115%).,TRUE,,43,31-08-2026 18:00
+31,2,budget_warning,You've spent EUR 40.00 of your EUR 50 Transport budget for August 2026 (80%).,TRUE,,44,31-08-2026 18:00
+32,2,budget_exceeded,You've spent EUR 178.58 of your EUR 60 Entertainment budget for August 2026 (298%).,TRUE,,45,31-08-2026 18:00
+33,2,budget_warning,You've spent EUR 190.01 of your EUR 200 Groceries budget for September 2026 (95%).,TRUE,,46,30-09-2026 18:00
+34,2,budget_exceeded,You've spent EUR 72.34 of your EUR 50 Transport budget for September 2026 (145%).,TRUE,,49,30-09-2026 18:00
+35,2,budget_exceeded,You've spent EUR 72.00 of your EUR 60 Entertainment budget for September 2026 (120%).,TRUE,,50,30-09-2026 18:00
+36,2,budget_exceeded,You've spent EUR 205.29 of your EUR 200 Groceries budget for October 2026 (103%).,TRUE,,51,31-10-2026 18:00
+37,2,budget_exceeded,You've spent EUR 141.76 of your EUR 120 Eating Out budget for October 2026 (118%).,TRUE,,52,31-10-2026 18:00
+38,2,budget_warning,You've spent EUR 49.66 of your EUR 50 Transport budget for October 2026 (99%).,TRUE,,54,31-10-2026 18:00
+39,2,budget_exceeded,You've spent EUR 137.29 of your EUR 60 Entertainment budget for October 2026 (229%).,TRUE,,55,31-10-2026 18:00
+40,2,large_transaction,Large Shopping purchase: EUR 53.23 at Amazon.ie.,TRUE,217,,08-06-2026 12:00
+41,2,large_transaction,Large Entertainment purchase: EUR 56.67 at Ticketmaster.,TRUE,279,,29-07-2026 12:00
+42,2,large_transaction,Large Entertainment purchase: EUR 55.11 at Ticketmaster.,TRUE,297,,08-08-2026 12:00
+43,2,large_transaction,Large Shopping purchase: EUR 52.57 at Amazon.ie.,TRUE,300,,13-08-2026 12:00
+44,2,large_transaction,Large Entertainment purchase: EUR 57.87 at Ticketmaster.,TRUE,366,,07-10-2026 12:00
+45,3,budget_warning,You've spent EUR 44.23 of your EUR 50 Eating Out budget for June 2026 (88%).,TRUE,,62,30-06-2026 18:00
+46,3,budget_exceeded,You've spent EUR 171.09 of your EUR 120 Shopping budget for June 2026 (143%).,TRUE,,63,30-06-2026 18:00
+47,3,budget_exceeded,You've spent EUR 121.25 of your EUR 70 Transport budget for June 2026 (173%).,TRUE,,64,30-06-2026 18:00
+48,3,budget_exceeded,You've spent EUR 153.59 of your EUR 40 Entertainment budget for June 2026 (384%).,TRUE,,65,30-06-2026 18:00
+49,3,budget_exceeded,You've spent EUR 330.06 of your EUR 180 Groceries budget for July 2026 (183%).,TRUE,,66,31-07-2026 18:00
+50,3,budget_exceeded,You've spent EUR 68.02 of your EUR 50 Eating Out budget for July 2026 (136%).,TRUE,,67,31-07-2026 18:00
+51,3,budget_exceeded,You've spent EUR 111.50 of your EUR 40 Entertainment budget for July 2026 (279%).,TRUE,,70,31-07-2026 18:00
+52,3,budget_exceeded,You've spent EUR 326.09 of your EUR 180 Groceries budget for August 2026 (181%).,TRUE,,71,31-08-2026 18:00
+53,3,budget_exceeded,You've spent EUR 100.40 of your EUR 50 Eating Out budget for August 2026 (201%).,TRUE,,72,31-08-2026 18:00
+54,3,budget_warning,You've spent EUR 112.45 of your EUR 120 Shopping budget for August 2026 (94%).,TRUE,,73,31-08-2026 18:00
+55,3,budget_exceeded,You've spent EUR 131.71 of your EUR 70 Transport budget for August 2026 (188%).,TRUE,,74,31-08-2026 18:00
+56,3,budget_exceeded,You've spent EUR 116.66 of your EUR 40 Entertainment budget for August 2026 (292%).,TRUE,,75,31-08-2026 18:00
+57,3,budget_exceeded,You've spent EUR 227.97 of your EUR 180 Groceries budget for September 2026 (127%).,TRUE,,76,30-09-2026 18:00
+58,3,budget_exceeded,You've spent EUR 161.82 of your EUR 120 Shopping budget for September 2026 (135%).,TRUE,,78,30-09-2026 18:00
+59,3,budget_exceeded,You've spent EUR 192.15 of your EUR 70 Transport budget for September 2026 (274%).,TRUE,,79,30-09-2026 18:00
+60,3,budget_exceeded,You've spent EUR 121.92 of your EUR 40 Entertainment budget for September 2026 (305%).,TRUE,,80,30-09-2026 18:00
+61,3,budget_exceeded,You've spent EUR 304.10 of your EUR 180 Groceries budget for October 2026 (169%).,TRUE,,81,31-10-2026 18:00
+62,3,budget_exceeded,You've spent EUR 74.49 of your EUR 50 Eating Out budget for October 2026 (149%).,TRUE,,82,31-10-2026 18:00
+63,3,budget_exceeded,You've spent EUR 110.15 of your EUR 70 Transport budget for October 2026 (157%).,TRUE,,84,31-10-2026 18:00
+64,3,budget_exceeded,You've spent EUR 75.79 of your EUR 40 Entertainment budget for October 2026 (189%).,TRUE,,85,31-10-2026 18:00
+65,3,budget_warning,You've spent EUR 155.67 of your EUR 180 Groceries budget for November 2026 (86%).,FALSE,,86,13-11-2026 18:00
+66,3,budget_exceeded,You've spent EUR 126.80 of your EUR 120 Shopping budget for November 2026 (106%).,FALSE,,88,13-11-2026 18:00
+67,3,large_transaction,Large Shopping purchase: EUR 51.90 at Amazon.ie.,TRUE,437,,18-06-2026 12:00
+68,3,large_transaction,Large Entertainment purchase: EUR 59.28 at Ticketmaster.,TRUE,519,,22-08-2026 12:00
+69,3,large_transaction,Large Shopping purchase: EUR 69.27 at Amazon.ie.,TRUE,562,,25-09-2026 12:00
+70,4,budget_exceeded,You've spent EUR 125.42 of your EUR 60 Transport budget for June 2026 (209%).,TRUE,,94,30-06-2026 18:00
+71,4,budget_exceeded,You've spent EUR 275.89 of your EUR 210 Groceries budget for July 2026 (131%).,TRUE,,96,31-07-2026 18:00
+72,4,budget_exceeded,You've spent EUR 195.11 of your EUR 150 Eating Out budget for July 2026 (130%).,TRUE,,97,31-07-2026 18:00
+73,4,budget_exceeded,You've spent EUR 88.87 of your EUR 60 Transport budget for July 2026 (148%).,TRUE,,99,31-07-2026 18:00
+74,4,budget_exceeded,You've spent EUR 209.64 of your EUR 80 Entertainment budget for July 2026 (262%).,TRUE,,100,31-07-2026 18:00
+75,4,budget_warning,You've spent EUR 208.36 of your EUR 210 Groceries budget for August 2026 (99%).,TRUE,,101,31-08-2026 18:00
+76,4,budget_exceeded,You've spent EUR 174.51 of your EUR 150 Eating Out budget for August 2026 (116%).,TRUE,,102,31-08-2026 18:00
+77,4,budget_warning,You've spent EUR 82.53 of your EUR 100 Shopping budget for August 2026 (83%).,TRUE,,103,31-08-2026 18:00
+78,4,budget_exceeded,You've spent EUR 193.97 of your EUR 150 Eating Out budget for September 2026 (129%).,TRUE,,107,30-09-2026 18:00
+79,4,budget_exceeded,You've spent EUR 99.46 of your EUR 60 Transport budget for September 2026 (166%).,TRUE,,109,30-09-2026 18:00
+80,4,budget_warning,You've spent EUR 209.66 of your EUR 210 Groceries budget for October 2026 (100%).,TRUE,,111,31-10-2026 18:00
+81,4,budget_warning,You've spent EUR 131.58 of your EUR 150 Eating Out budget for October 2026 (88%).,TRUE,,112,31-10-2026 18:00
+82,4,budget_warning,You've spent EUR 50.12 of your EUR 60 Transport budget for October 2026 (84%).,TRUE,,114,31-10-2026 18:00
+83,4,budget_exceeded,You've spent EUR 112.39 of your EUR 80 Entertainment budget for October 2026 (140%).,TRUE,,115,31-10-2026 18:00
+84,4,large_transaction,Large Entertainment purchase: EUR 54.98 at Ticketmaster.,TRUE,795,,16-10-2026 12:00
+85,5,budget_exceeded,You've spent EUR 196.36 of your EUR 190 Groceries budget for June 2026 (103%).,TRUE,,121,30-06-2026 18:00
+86,5,budget_exceeded,You've spent EUR 125.00 of your EUR 90 Shopping budget for June 2026 (139%).,TRUE,,123,30-06-2026 18:00
+87,5,budget_exceeded,You've spent EUR 248.30 of your EUR 190 Groceries budget for July 2026 (131%).,TRUE,,126,31-07-2026 18:00
+88,5,budget_exceeded,You've spent EUR 88.61 of your EUR 60 Eating Out budget for July 2026 (148%).,TRUE,,127,31-07-2026 18:00
+89,5,budget_exceeded,You've spent EUR 146.91 of your EUR 90 Shopping budget for July 2026 (163%).,TRUE,,128,31-07-2026 18:00
+90,5,budget_exceeded,You've spent EUR 110.62 of your EUR 55 Transport budget for July 2026 (201%).,TRUE,,129,31-07-2026 18:00
+91,5,budget_exceeded,You've spent EUR 55.25 of your EUR 45 Entertainment budget for July 2026 (123%).,TRUE,,130,31-07-2026 18:00
+92,5,budget_exceeded,You've spent EUR 292.05 of your EUR 190 Groceries budget for August 2026 (154%).,TRUE,,131,31-08-2026 18:00
+93,5,budget_exceeded,You've spent EUR 79.06 of your EUR 60 Eating Out budget for August 2026 (132%).,TRUE,,132,31-08-2026 18:00
+94,5,budget_exceeded,You've spent EUR 115.76 of your EUR 90 Shopping budget for August 2026 (129%).,TRUE,,133,31-08-2026 18:00
+95,5,budget_exceeded,You've spent EUR 108.85 of your EUR 45 Entertainment budget for August 2026 (242%).,TRUE,,135,31-08-2026 18:00
+96,5,budget_exceeded,You've spent EUR 250.57 of your EUR 190 Groceries budget for September 2026 (132%).,TRUE,,136,30-09-2026 18:00
+97,5,budget_exceeded,You've spent EUR 70.22 of your EUR 60 Eating Out budget for September 2026 (117%).,TRUE,,137,30-09-2026 18:00
+98,5,budget_exceeded,You've spent EUR 218.57 of your EUR 90 Shopping budget for September 2026 (243%).,TRUE,,138,30-09-2026 18:00
+99,5,budget_exceeded,You've spent EUR 153.89 of your EUR 55 Transport budget for September 2026 (280%).,TRUE,,139,30-09-2026 18:00
+100,5,budget_warning,You've spent EUR 44.53 of your EUR 45 Entertainment budget for September 2026 (99%).,TRUE,,140,30-09-2026 18:00
+101,5,budget_exceeded,You've spent EUR 295.99 of your EUR 190 Groceries budget for October 2026 (156%).,TRUE,,141,31-10-2026 18:00
+102,5,budget_exceeded,You've spent EUR 158.27 of your EUR 90 Shopping budget for October 2026 (176%).,TRUE,,143,31-10-2026 18:00
+103,5,budget_exceeded,You've spent EUR 136.14 of your EUR 55 Transport budget for October 2026 (248%).,TRUE,,144,31-10-2026 18:00
+104,5,budget_exceeded,You've spent EUR 64.27 of your EUR 45 Entertainment budget for October 2026 (143%).,TRUE,,145,31-10-2026 18:00
+105,5,budget_warning,You've spent EUR 184.17 of your EUR 190 Groceries budget for November 2026 (97%).,FALSE,,146,13-11-2026 18:00
+106,5,budget_exceeded,You've spent EUR 72.26 of your EUR 45 Entertainment budget for November 2026 (161%).,FALSE,,150,13-11-2026 18:00
+107,5,large_transaction,Large Entertainment purchase: EUR 53.53 at Ticketmaster.,TRUE,909,,19-08-2026 12:00
+108,5,large_transaction,Large Shopping purchase: EUR 57.37 at Amazon.ie.,TRUE,915,,22-08-2026 12:00
+109,5,large_transaction,Large Shopping purchase: EUR 58.18 at Amazon.ie.,TRUE,988,,16-10-2026 12:00
