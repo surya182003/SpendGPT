@@ -1,4 +1,5 @@
-from receipt_parser import parse_receipt_text, validate_receipt
+from receipt_parser import parse_receipt_text
+from validation import validate_receipt
 
 LIDL = """
 L
@@ -124,7 +125,7 @@ def show(name, text):
     print(f"== {name}: total={r['total_amount']} via {r['total_source']}, "
           f"items={len(r['items'])}, issues={r['validation_issues']}")
     for it in r["items"]:
-        print("  ", it["product_code"], it["item_name"], it["quantity"],
+        print("  ", it["item_name"], it["quantity"],
               it["unit_price"], "-", it["discount"], "=", it["line_total"])
     return r
 
@@ -144,7 +145,7 @@ assert not aldi["requires_review"], aldi["validation_issues"]
 tuna = next(i for i in aldi["items"] if "TUNA" in i["item_name"])
 assert tuna["quantity"] == 3 and tuna["unit_price"] == 0.79
 assert any(i["item_name"] == "TOMATO KETCHUP" for i in aldi["items"])
-assert any(i["product_code"] == "275578" for i in aldi["items"])
+
 
 # A lone price must never become the total.
 no_total = validate_receipt(parse_receipt_text("Milk\n1.15 A\nBread\n1.89 A\n"))

@@ -10,7 +10,8 @@ OCR_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(OCR_DIR))
 
 # my parser for receipts, which uses Indra OCR to extract text from images - change this to your own parser if you want to use a different OCR engine
-from receipt_parser import parse_receipt_text, validate_receipt
+from receipt_parser import parse_receipt_text
+from validation import validate_receipt
 
 DEFAULT_IMAGE = OCR_DIR / "test_images" / "aldi_test.jpeg"
 
