@@ -1,6 +1,6 @@
-
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -60,8 +60,8 @@ def check_budget_period(
     db: Session,
     user_id: int,
     category_id: int | None,
-    start_date,
-    end_date,
+    start_date: date,
+    end_date: date,
     exclude_budget_id: int | None = None
 ):
     statement = select(Budget).where(
