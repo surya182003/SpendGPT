@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -7,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.models.category import Category
 from app.schemas.transaction_schema import TransactionCreate, TransactionResponse
 
 
@@ -31,6 +31,15 @@ def create_transaction(
             status.HTTP_404_NOT_FOUND,
             "User not found"
         )
+
+    if payload.category_id is not None:
+        category = db.get(Category, payload.category_id)
+
+        if category is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Category not found"
+            )
 
     transaction = Transaction(
         user_id=user_id,
