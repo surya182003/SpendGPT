@@ -7,3 +7,11 @@ SpendGPT– AI Student Finance Copilot | React, FastAPI, MySQL, Local LLM (Ollam
   MySQL for persistence.
 * Implementing local ML models for automatic transaction categorisation and anomaly detection, paired with a
   local LLM (Ollama) for conversational money insight
+
+## Python dependencies
+
+Install the shared Python dependencies from the repository root:
+
+```bash
+python -m pip install -r requirements.txt
+```
