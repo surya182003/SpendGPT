@@ -14,7 +14,7 @@ from app.services.categorization_service import (
     model_text,
     normalize_text,
 )
-from tests.conftest import FakeLMStudio, category_id, make_user
+from tests.conftest import FakeLMStudio, category_id, create_user
 
 
 def test_normalize_text():
@@ -89,7 +89,7 @@ def test_model_trains_on_seed_dataset():
 
 
 def test_user_history_wins_and_is_scoped_to_the_user(db):
-    me, other = make_user(db, "me@example.com"), make_user(db, "other@example.com")
+    me, other = create_user(db, "me@example.com"), create_user(db, "other@example.com")
     db.add(Transaction(user_id=me.user_id, merchant_name="Corner Shop", amount=5,
                        transaction_date=date(2026, 11, 1), category_id=category_id(db, "Groceries")))
     db.commit()

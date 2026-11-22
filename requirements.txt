@@ -12,6 +12,8 @@ mysql-connector-python
 python-dotenv
 numpy
 pandas
-# AI engineering
+# testing
+pytest
 httpx
+# AI engineering (httpx above is also the LM Studio client)
 scikit-learn

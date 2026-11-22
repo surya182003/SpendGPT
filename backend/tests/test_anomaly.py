@@ -15,7 +15,7 @@ from app.services.anomaly_service import (
     robust_z_score,
     store_alerts,
 )
-from tests.conftest import category_id, make_user
+from tests.conftest import category_id, create_user
 
 NAMES = {1: "Groceries", 2: "Rent", 6: "Eating Out"}
 TODAY = date(2026, 11, 20)
@@ -105,7 +105,7 @@ def _add(db, user, amount, days_ago, merchant="Tesco", name="Groceries"):
 
 
 def test_alerts_stored_in_alerts_table_once(db):
-    user = make_user(db)
+    user = create_user(db)
     for i in range(8):
         _add(db, user, 40 + i, 60 - i * 5)
     big = _add(db, user, 200, 0)
@@ -121,7 +121,7 @@ def test_alerts_stored_in_alerts_table_once(db):
 
 
 def test_user_isolation(db):
-    me, other = make_user(db, "me@example.com"), make_user(db, "other@example.com")
+    me, other = create_user(db, "me@example.com"), create_user(db, "other@example.com")
     for i in range(8):
         _add(db, other, 40 + i, 60 - i * 5)
     _add(db, other, 300, 0)
@@ -133,7 +133,7 @@ def test_user_isolation(db):
 
 
 def test_check_new_transaction_uses_only_earlier_history(db):
-    user = make_user(db)
+    user = create_user(db)
     for i in range(8):
         _add(db, user, 40 + i, 60 - i * 5)
     new = _add(db, user, 210, 0)
