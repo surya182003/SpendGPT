@@ -1,12 +1,12 @@
 # SpendGPT
-An AI-powered student finance copilot featuring local ML transaction categorization, anomaly detection, and a local LLM (Ollama) for conversational money insights. Fully stack-implemented using React, FastAPI, MySQL, and layered architecture.
+An AI-powered student finance copilot featuring local ML transaction categorization, anomaly detection, and a local LLM (LM Studio) for conversational money insights. Fully stack-implemented using React, FastAPI, MySQL, and layered architecture.
 
-SpendGPT– AI Student Finance Copilot | React, FastAPI, MySQL, Local LLM (Ollama)
+SpendGPT– AI Student Finance Copilot | React, FastAPI, MySQL, Local LLM (LM Studio)
 
 * Building a full-stack finance copilot with a React frontend and FastAPI backend, using a layered architecture with
   MySQL for persistence.
 * Implementing local ML models for automatic transaction categorisation and anomaly detection, paired with a
-  local LLM (Ollama) for conversational money insight
+  local LLM (LM Studio) for conversational money insight
 
 ## Requirements
 
@@ -96,6 +96,13 @@ python ocr.py test_images/aldi_test.jpeg    # full OCR + save to TiDB
 `ocr.py` needs `indra-ocr` installed and a `database/.env` file with `TIDB_HOST`, `TIDB_PORT`, `TIDB_USER`,
 `TIDB_PASSWORD` and `TIDB_DATABASE`.
 
+## AI features (LM Studio)
+
+The AI features run locally through LM Studio's OpenAI-compatible server
+(`http://localhost:1234/v1`). The React app only calls the FastAPI `/api/ai/*`
+endpoints and never calls LM Studio directly. For model download, server setup,
+configuration and tests, see [docs/AI_ENGINEERING.md](docs/AI_ENGINEERING.md).
+
 ## 5. Run the tests
 
 From the repository root (or from `backend/`):
@@ -118,7 +125,7 @@ If `pytest` isn't found, use `python -m pytest`.
 The tests use a temporary in-memory database, so they never touch `spendgpt.db` or TiDB. OCR is faked in the
 upload tests, so `indra-ocr` isn't needed.
 
-**Reading the result:** the last line should look like `201 passed, 4 xfailed`. Each `xfailed` test marks a
+**Reading the result:** the last line should look like `271 passed, 4 deselected, 4 xfailed` (the 4 deselected are the live LM Studio tests). Each `xfailed` test marks a
 known bug and is expected to fail. When you fix one, its test reports as failing until you delete the
 `@pytest.mark.xfail(...)` line above it, which turns it into a normal test.
 
@@ -130,6 +137,12 @@ known bug and is expected to fail. When you fix one, its test reports as failing
 | `backend/tests/test_receipts.py` | Receipt upload and AI receipt endpoints |
 | `backend/tests/test_ocr_parser.py` | OCR text parser (money, totals, dates, sample receipts) |
 | `backend/tests/test_health_and_categories.py` | Health check and categories |
+| `backend/tests/test_lmstudio_service.py` | LM Studio client (mocked server) |
+| `backend/tests/test_categorization.py` | AI transaction categorisation |
+| `backend/tests/test_anomaly.py` | Unusual-spending detection and alerts |
+
+`backend/tests/test_lmstudio_live.py` talks to a real LM Studio server, so it is excluded by default.
+Run it by hand with `pytest -m lmstudio -v -s` while LM Studio is running.
 
 ### Continuous integration
 

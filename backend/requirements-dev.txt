@@ -1,0 +1,3 @@
+# Test-only dependencies. Runtime dependencies live in the root requirements.txt.
+-r ../requirements.txt
+pytest>=8
