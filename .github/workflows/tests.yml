@@ -25,5 +25,20 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-ci.txt
 
-      - name: Run tests
-        run: python -m pytest
+      - name: Run tests with coverage
+        run: python -m pytest --cov=backend/app --cov-report=term --cov-report=html
+
+      # Shows the coverage table on the run's summary page (Actions tab -> the run).
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo "## Test coverage" >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+      # Downloadable HTML report showing exactly which lines are untested.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/

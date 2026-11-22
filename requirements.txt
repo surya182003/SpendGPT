@@ -15,5 +15,7 @@ pandas
 # testing
 pytest
 httpx
+pytest-cov
+schemathesis
 # AI engineering (httpx above is also the LM Studio client)
 scikit-learn

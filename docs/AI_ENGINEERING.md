@@ -106,8 +106,7 @@ It also does the following:
 ### 1.5 Tests
 
 ```bash
-cd backend
-pip install -r requirements-dev.txt
+pip install -r requirements.txt   # from the repo root; includes the test tools
 pytest                      # automated tests: mocked LM Studio (httpx.MockTransport), no server needed
 pytest -m lmstudio -v -s    # manual integration test against a real, running LM Studio
 ```

@@ -244,3 +244,69 @@ def test_ai_user_receipts_only_that_user(client, make_user, fake_ocr):
 
 def test_ai_user_receipts_unknown_user_is_404(client):
     assert client.get("/api/ai/users/999/receipts").status_code == 404
+
+
+def test_ai_user_receipts_limit_zero_returns_nothing(client, user, fake_ocr):
+    upload(client, user["user_id"])
+    assert client.get(f"/api/ai/users/{user['user_id']}/receipts", params={"limit": 0}).json() == []
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="BUG: a negative limit isn't rejected; SQLite treats LIMIT -1 as 'no limit' and returns everything. "
+    "Use limit: int = Query(50, ge=1, le=200).",
+)
+def test_ai_user_receipts_negative_limit_is_422(client, user):
+    assert client.get(f"/api/ai/users/{user['user_id']}/receipts", params={"limit": -1}).status_code == 422
+
+
+# ---------- bad input never crashes the server ----------
+
+HUGE_ID = 10**23  # bigger than any database integer column
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="BUG: IDs larger than 64 bits crash the server (500, SQLite OverflowError). "
+    "Bound IDs, e.g. Annotated[int, Field(gt=0, le=2_147_483_647)].",
+)
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(lambda c, u: upload(c, HUGE_ID), id="upload-huge-user_id"),
+        pytest.param(lambda c, u: c.get(f"/api/ai/receipts/{HUGE_ID}"), id="ai-receipt-huge-id"),
+        pytest.param(lambda c, u: c.get(f"/api/ai/users/{HUGE_ID}/receipts"), id="ai-receipts-huge-user_id"),
+        pytest.param(lambda c, u: c.get(f"/api/ai/users/{u}/receipts", params={"limit": HUGE_ID}), id="ai-receipts-huge-limit"),
+    ],
+)
+def test_huge_ids_do_not_crash_the_server(client, user, fake_ocr, call):
+    assert call(client, user["user_id"]).status_code in (404, 422)
+
+
+def test_upload_non_numeric_user_id_is_422(client, fake_ocr):
+    response = client.post(UPLOAD, data={"user_id": "abc"}, files={"file": ("r.jpg", b"x", "image/jpeg")})
+    assert response.status_code == 422
+
+
+# ---------- upload limits ----------
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="BUG: no upload size limit - the whole file is read into memory, so huge uploads can exhaust "
+    "server memory. Reject files over e.g. 10 MB with 413.",
+)
+def test_upload_over_size_limit_is_rejected(client, user, fake_ocr):
+    twenty_mb = b"\xff\xd8\xff" + b"0" * (20 * 1024 * 1024)
+    assert upload(client, user["user_id"], content=twenty_mb).status_code == 413
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="BUG: only the client-sent Content-Type is checked, not the file itself. A text file labelled "
+    "image/jpeg reaches OCR. Check the file's magic bytes (JPEG starts FF D8 FF, PNG with 89 50 4E 47).",
+)
+def test_upload_text_file_pretending_to_be_image_is_400(client, user, fake_ocr):
+    calls = fake_ocr()
+    response = upload(client, user["user_id"], content=b"this is not an image", content_type="image/jpeg")
+    assert response.status_code == 400
+    assert calls == []
