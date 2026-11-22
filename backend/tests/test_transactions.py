@@ -89,6 +89,103 @@ def test_create_transaction_invalid_date_is_422(client, user, bad_date):
     assert create_txn(client, user["user_id"], transaction_date=bad_date).status_code == 422
 
 
+# ---------- bad input: clean 422s, never a crash ----------
+# Trello: "Prevent server crashes by validating bad user input"
+
+def error_fields(response):
+    """The field names a 422 response complains about, e.g. {"amount", "merchant_name"}."""
+    return {err["loc"][-1] for err in response.json()["detail"] if len(err["loc"]) > 1}
+
+
+def test_empty_body_lists_every_missing_field(client, user):
+    response = client.post(BASE, params={"user_id": user["user_id"]}, json={})
+    assert response.status_code == 422
+    assert error_fields(response) == {"merchant_name", "amount", "transaction_date"}
+    assert all(err["msg"] == "Field required" for err in response.json()["detail"])
+
+
+@pytest.mark.parametrize("body", [None, [1, 2], "just a string", 42])
+def test_body_that_is_not_an_object_is_422(client, user, body):
+    assert client.post(BASE, params={"user_id": user["user_id"]}, json=body).status_code == 422
+
+
+def test_malformed_json_is_422(client, user):
+    response = client.post(
+        BASE,
+        params={"user_id": user["user_id"]},
+        content=b'{"merchant_name": "Aldi", ',
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("amount", "NaN"),
+        ("amount", "Infinity"),
+        ("amount", True),
+        ("amount", None),
+        ("merchant_name", 123),
+        ("merchant_name", None),
+        ("transaction_date", 20261101),
+        ("transaction_date", "2026-11-01T10:00:00"),
+        ("transaction_date", None),
+        ("category_id", "abc"),
+        ("category_id", 1.5),
+        ("is_recurring", "maybe"),
+        ("is_recurring", None),
+    ],
+)
+def test_wrong_type_is_422_and_names_the_field(client, user, field, value):
+    response = create_txn(client, user["user_id"], **{field: value})
+    assert response.status_code == 422
+    assert field in error_fields(response)
+
+
+def test_non_numeric_user_id_is_422(client):
+    response = client.post(BASE, params={"user_id": "abc"}, json=txn_payload())
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["query", "user_id"]
+
+
+def test_error_message_is_understandable(client, user):
+    response = create_txn(client, user["user_id"], amount="-1")
+    error = response.json()["detail"][0]
+    assert response.status_code == 422
+    assert error["loc"] == ["body", "amount"]
+    assert error["msg"] == "Input should be greater than 0"
+
+
+def test_rejected_input_saves_nothing(client, user):
+    create_txn(client, user["user_id"], amount="-1")
+    create_txn(client, user["user_id"], merchant_name="")
+    create_txn(client, user["user_id"], transaction_date="not-a-date")
+    assert client.get(f"{BASE}user/{user['user_id']}").json() == []
+
+
+HUGE_ID = 10**23  # bigger than any database integer column
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="BUG: IDs larger than 64 bits crash the server (500, SQLite OverflowError). "
+    "Bound IDs, e.g. Annotated[int, Field(gt=0, le=2_147_483_647)] for query/path/body IDs.",
+)
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(lambda c: c.post(BASE, params={"user_id": HUGE_ID}, json=txn_payload()), id="create-huge-user_id"),
+        pytest.param(lambda c: c.post(BASE, params={"user_id": 1}, json=txn_payload(category_id=HUGE_ID)), id="create-huge-category_id"),
+        pytest.param(lambda c: c.get(f"{BASE}{HUGE_ID}"), id="get-huge-transaction_id"),
+        pytest.param(lambda c: c.get(f"{BASE}user/{HUGE_ID}"), id="list-huge-user_id"),
+        pytest.param(lambda c: c.delete(f"{BASE}{HUGE_ID}"), id="delete-huge-transaction_id"),
+    ],
+)
+def test_huge_ids_do_not_crash_the_server(client, user, call):
+    assert call(client).status_code in (404, 422)
+
+
 # ---------- list ----------
 
 def test_list_transactions_newest_first(client, user):
