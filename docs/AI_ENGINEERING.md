@@ -113,3 +113,79 @@ pytest -m lmstudio -v -s    # manual integration test against a real, running LM
 ```
 
 The live tests skip themselves when the server is unreachable.
+
+---
+
+## 2. Transaction categorisation
+
+`backend/app/services/categorization_service.py`
+
+### 2.1 Design
+
+Predictions always map onto rows of the existing `categories` table. The model predicts a
+category **name**, which is resolved to the live `category_id` with a lookup on
+`categories.category_name`. If a predicted name does not exist in the database, no id is
+invented and the result falls back to the default. There is no text category column.
+
+Tiers, tried in order. The first confident answer wins:
+
+| # | Source    | How | Confidence |
+|---|-----------|-----|------------|
+| 1 | `history` | The same user's earlier transactions from the same (normalised) merchant, by majority vote. Scoped to that user. | 0.9 × vote share |
+| 2 | `rule`    | Whole-word keyword rules for Irish merchants (`MERCHANT_RULES`). The longest keyword wins, so "Tesco Mobile" beats "Tesco". | 0.95 |
+| 3 | `ml`      | Character n-gram (2–5) TF-IDF + logistic regression (`tfidf-char-logreg-v1`), trained on the seed transactions and receipt items. Used only when probability ≥ 0.6. | model probability |
+| 4 | `llm`     | LM Studio with a JSON schema that restricts the answer to the category names in the database. Off-list answers are rejected. | 0.7 |
+| 5 | `default` | "Other", confidence 0. Automatic save paths leave `category_id` NULL in this case. | 0 |
+
+The LLM is **not** used for routine categorisation. Rules and ML handle known merchants in
+microseconds. The LLM tier is only used by `POST /api/ai/categorize` when `use_llm=true`, so
+saving a transaction never waits on a model.
+
+The service also handles messy input:
+
+* Missing merchant or description: an empty value or the receipt placeholder "Unknown" counts as missing.
+* Unknown merchants: low ML probability falls through to the LLM tier or the default. The service never guesses.
+* Receipts (`categorize_receipt`): the merchant is tried first. If it is unknown, the receipt items vote,
+  weighted by line total, using item rules and then ML.
+* OCR noise: `normalize_text` strips accents and punctuation. `model_text` also strips store numbers and
+  generic tokens ("stores", "ltd", "ie", city names) before the ML step.
+
+### 2.2 Training data and future improvements
+
+* The model trains lazily on the team's seed data (`database/transactions.csv` and
+  `categories.csv`, plus `receipt_items.csv` item names labelled with their transaction's category).
+  That is 1,021 transactions over 9 categories and 30 distinct merchants.
+* `retrain_from_database(db)` retrains on the seed data plus every labelled transaction in the
+  database, as data accumulates. The model is versioned through `MODEL_VERSION`, and
+  `CategoryModel.build_pipeline()` is the single place to swap in a different estimator.
+
+### 2.3 Evaluation
+
+Run `python -m app.services.categorization_eval` from `backend/`. Results on the seed dataset:
+
+| Experiment | Accuracy | Macro-F1 |
+|------------|---------:|---------:|
+| Majority-class baseline | 0.310 | 0.053 |
+| ML only, stratified 5-fold (merchants seen in training) | 1.000 | 1.000 |
+| ML only, leave-merchant-out GroupKFold (**unseen merchants**) | 0.229 | 0.098 |
+| Rules only, clean seed merchants (coverage 100%)* | 1.000 | 1.000 |
+| Hybrid rules → ML, OCR-style noisy names (stripped suffixes) | 1.000 | 1.000 |
+| Hybrid rules → ML, OCR-style noisy names (**unstripped suffixes**) | 0.986 | 0.896 |
+
+\* Optimistic, because the rule list was written to include the seed merchants.
+
+How to read these results:
+
+* The seed data has only 30 merchants, so random splits measure memorisation (1.0).
+  The leave-merchant-out score (0.229) is the honest number for new brands. Character n-grams
+  cannot infer that an unseen brand name is a café. This is why the rule list and the
+  optional LLM tier exist.
+* The first noisy-variant run (before `model_text`) found a spurious feature: " STORES" pushed
+  predictions towards Groceries because of "Dunnes Stores", and the hybrid abstained or erred
+  on 9 of 1,021. Stripping generic store tokens fixed this and raised unseen-merchant
+  accuracy from 0.185 to 0.229.
+* On noisy names with suffixes that preprocessing does not strip, the hybrid abstains to
+  "Other" (14 cases) rather than guessing. The lower macro-F1 reflects those abstentions.
+
+`tests/test_categorization.py` checks the category_id mapping, unknown and missing input, user
+scoping of history, the LLM tier (mocked), receipts, and a regression guard on these metrics.

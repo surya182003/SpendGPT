@@ -84,3 +84,56 @@ def offline_llm():
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
+
+
+# -- database -------------------------------------------------------------------------
+# Same names and order as the INSERT in database/SpendGPT.sql.
+SEED_CATEGORIES = [
+    ("Groceries", "Essential"), ("Rent", "Essential"), ("Utilities", "Essential"),
+    ("Transport", "Essential"), ("Health", "Essential"), ("Eating Out", "Discretionary"),
+    ("Shopping", "Discretionary"), ("Entertainment", "Discretionary"),
+    ("Subscriptions", "Discretionary"), ("Other", "Discretionary"),
+]
+
+
+def reset_database(categories=SEED_CATEGORIES):
+    """Drop and recreate every table, then seed the categories table."""
+    import app.models  # noqa: F401  (registers every model on Base.metadata)
+    from app.database import Base, SessionLocal, engine
+    from app.models.category import Category
+
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    with SessionLocal() as session:
+        session.add_all(Category(category_name=n, spend_type=t) for n, t in categories)
+        session.commit()
+
+
+@pytest.fixture
+def db():
+    from app.database import SessionLocal
+
+    reset_database()
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+def make_user(db, email="student@example.com", **fields):
+    from app.models.user import User
+
+    user = User(first_name=fields.pop("first_name", "Test"), last_name="Student", email=email,
+                password_hash="x", **fields)
+    db.add(user)
+    db.commit()
+    return user
+
+
+def category_id(db, name):
+    from sqlalchemy import select
+
+    from app.models.category import Category
+
+    return db.scalar(select(Category.category_id).where(Category.category_name == name))
