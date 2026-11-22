@@ -12,3 +12,6 @@ mysql-connector-python
 python-dotenv
 numpy
 pandas
+# testing
+pytest
+httpx
