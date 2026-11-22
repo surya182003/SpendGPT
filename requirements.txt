@@ -12,3 +12,5 @@ mysql-connector-python
 python-dotenv
 numpy
 pandas
+# AI engineering
+httpx
