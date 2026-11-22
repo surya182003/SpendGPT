@@ -130,3 +130,11 @@ known bug and is expected to fail. When you fix one, its test reports as failing
 | `backend/tests/test_receipts.py` | Receipt upload and AI receipt endpoints |
 | `backend/tests/test_ocr_parser.py` | OCR text parser (money, totals, dates, sample receipts) |
 | `backend/tests/test_health_and_categories.py` | Health check and categories |
+
+### Continuous integration
+
+GitHub Actions runs the full test suite on every pull request and every push to `main`
+(see `.github/workflows/tests.yml`). A green tick on a PR means all tests passed; a red cross means
+something broke. Click **Details** next to the check to see which test failed.
+
+You can also run it by hand from the repo's **Actions** tab → **Tests** → **Run workflow**.
