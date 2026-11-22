@@ -122,10 +122,28 @@ pytest -x                                  # stop at the first failure
 
 If `pytest` isn't found, use `python -m pytest`.
 
+**Coverage** (which lines of the backend the tests run):
+
+```bash
+pytest --cov=backend/app --cov-report=term-missing   # table in the terminal, with untested line numbers
+pytest --cov=backend/app --cov-report=html           # then open htmlcov/index.html in a browser
+```
+
+**Fuzzing** (Schemathesis sends hundreds of generated requests to every endpoint and fails if any of them
+crashes the server with a 500). It's slower, so a plain `pytest` skips it:
+
+```bash
+pytest -m fuzz
+```
+
+The fuzz test currently fails because of the known "huge IDs crash the server" bug. Once that's fixed, it should
+pass and can be added to CI.
+
 The tests use a temporary in-memory database, so they never touch `spendgpt.db` or TiDB. OCR is faked in the
 upload tests, so `indra-ocr` isn't needed.
 
-**Reading the result:** the last line should look like `271 passed, 4 deselected, 4 xfailed` (the 4 deselected are the live LM Studio tests). Each `xfailed` test marks a
+**Reading the result:** the last line should look like `315 passed, 20 deselected, 23 xfailed`
+("deselected" are the live LM Studio tests and the fuzz tests). Each `xfailed` test marks a
 known bug and is expected to fail. When you fix one, its test reports as failing until you delete the
 `@pytest.mark.xfail(...)` line above it, which turns it into a normal test.
 
@@ -137,9 +155,11 @@ known bug and is expected to fail. When you fix one, its test reports as failing
 | `backend/tests/test_receipts.py` | Receipt upload and AI receipt endpoints |
 | `backend/tests/test_ocr_parser.py` | OCR text parser (money, totals, dates, sample receipts) |
 | `backend/tests/test_health_and_categories.py` | Health check and categories |
+| `backend/tests/test_seed_and_services.py` | Seed script and OCR service temp-file handling |
 | `backend/tests/test_lmstudio_service.py` | LM Studio client (mocked server) |
 | `backend/tests/test_categorization.py` | AI transaction categorisation |
 | `backend/tests/test_anomaly.py` | Unusual-spending detection and alerts |
+| `backend/tests/test_fuzz_api.py` | Automatic fuzzing of every endpoint (`pytest -m fuzz`) |
 
 `backend/tests/test_lmstudio_live.py` talks to a real LM Studio server, so it is excluded by default.
 Run it by hand with `pytest -m lmstudio -v -s` while LM Studio is running.
@@ -149,5 +169,8 @@ Run it by hand with `pytest -m lmstudio -v -s` while LM Studio is running.
 GitHub Actions runs the full test suite on every pull request and every push to `main`
 (see `.github/workflows/tests.yml`). A green tick on a PR means all tests passed; a red cross means
 something broke. Click **Details** next to the check to see which test failed.
+
+Each run's summary page shows a coverage table, and the full HTML coverage report can be downloaded from the
+**Artifacts** section at the bottom of that page (`coverage-report`).
 
 You can also run it by hand from the repo's **Actions** tab → **Tests** → **Run workflow**.

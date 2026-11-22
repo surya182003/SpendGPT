@@ -233,3 +233,59 @@ def test_cannot_delete_another_users_budget(client, make_user):
 
 def test_delete_unknown_budget_is_404(client, user):
     assert client.delete(f"{BASE}999", params={"user_id": user["user_id"]}).status_code == 404
+
+
+# ---------- bad input never crashes the server ----------
+
+HUGE_ID = 10**23  # bigger than any database integer column
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="BUG: IDs larger than 64 bits crash the server (500, SQLite OverflowError). "
+    "Bound IDs, e.g. Annotated[int, Field(gt=0, le=2_147_483_647)].",
+)
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(lambda c, u: c.post(BASE, params={"user_id": HUGE_ID}, json=budget_payload()), id="create-huge-user_id"),
+        pytest.param(lambda c, u: c.post(BASE, params={"user_id": u}, json=budget_payload(category_id=HUGE_ID)), id="create-huge-category_id"),
+        pytest.param(lambda c, u: c.get(f"{BASE}user/{HUGE_ID}"), id="list-huge-user_id"),
+        pytest.param(lambda c, u: c.get(f"{BASE}{HUGE_ID}", params={"user_id": u}), id="get-huge-budget_id"),
+        pytest.param(lambda c, u: c.get(f"{BASE}1", params={"user_id": HUGE_ID}), id="get-huge-user_id"),
+        pytest.param(lambda c, u: c.put(f"{BASE}{HUGE_ID}", params={"user_id": u}, json=budget_payload()), id="update-huge-budget_id"),
+        pytest.param(lambda c, u: c.delete(f"{BASE}{HUGE_ID}", params={"user_id": u}), id="delete-huge-budget_id"),
+    ],
+)
+def test_huge_ids_do_not_crash_the_server(client, user, call):
+    assert call(client, user["user_id"]).status_code in (404, 422)
+
+
+def test_empty_budget_body_lists_every_missing_field(client, user):
+    response = client.post(BASE, params={"user_id": user["user_id"]}, json={})
+    assert response.status_code == 422
+    fields = {err["loc"][-1] for err in response.json()["detail"]}
+    assert fields == {"amount_limit", "start_date", "end_date"}
+
+
+def test_budget_date_error_message_is_understandable(client, user):
+    response = create_budget(client, user["user_id"], start_date="2026-11-30", end_date="2026-11-01")
+    assert response.status_code == 422
+    assert "End date cannot be earlier than start date" in response.json()["detail"][0]["msg"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("amount_limit", "NaN"),
+        ("amount_limit", "Infinity"),
+        ("amount_limit", None),
+        ("start_date", "not-a-date"),
+        ("end_date", 20261130),
+        ("category_id", "abc"),
+    ],
+)
+def test_budget_wrong_type_is_422_and_names_the_field(client, user, field, value):
+    response = create_budget(client, user["user_id"], **{field: value})
+    assert response.status_code == 422
+    assert field in {err["loc"][-1] for err in response.json()["detail"]}

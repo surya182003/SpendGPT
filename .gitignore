@@ -22,3 +22,9 @@ node_modules/
 *.sqlite3
 .vscode/
 .idea/
+# Test coverage output
+.coverage
+htmlcov/
+
+# Local SQLite database created by the backend
+spendgpt.db

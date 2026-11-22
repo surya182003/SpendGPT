@@ -190,7 +190,9 @@ def test_all_errors_share_a_base_class():
 
 
 def test_real_unreachable_port():
-    client = LMStudioClient(base_url="http://127.0.0.1:9/v1", model="m", timeout=1, connect_timeout=1, enabled=True)
+    # connect_timeout must be > ~2.5s: Windows retries a refused localhost connection for ~2s before
+    # reporting it, so a 1s timeout raises LMStudioTimeoutError there instead of a connection error.
+    client = LMStudioClient(base_url="http://127.0.0.1:9/v1", model="m", timeout=5, connect_timeout=5, enabled=True)
     assert client.is_available() is False
     with pytest.raises(LMStudioConnectionError):
         client.chat([{"role": "user", "content": "hi"}])
