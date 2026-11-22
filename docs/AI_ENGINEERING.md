@@ -189,3 +189,61 @@ How to read these results:
 
 `tests/test_categorization.py` checks the category_id mapping, unknown and missing input, user
 scoping of history, the LLM tier (mocked), receipts, and a regression guard on these metrics.
+
+---
+
+## 3. Unusual-spending detection and alerts
+
+`backend/app/services/anomaly_service.py`, `backend/app/models/alert.py`
+
+### 3.1 Method
+
+Student histories are small, so the detector uses robust statistics instead of a model that
+needs a lot of training data. Every flag has a `message` and a plain-language `explanation`.
+Flags never call spending fraud. They say a payment is unusual for this user, and suggest
+checking a bank statement if it isn't recognised.
+
+| Flag | Rule | Alert type stored |
+|------|------|-------------------|
+| `amount_outlier` | Robust z-score `0.6745·(x − median)/MAD` > 3.5 (Iglewicz & Hoaglin) against the user's **earlier transactions in the same category**, and at least €15 above the typical amount. Constant bills (MAD = 0) only count when the amount doubles. | `large_transaction` |
+| `possible_duplicate` | Same merchant and amount on the same or next day. Skipped for `is_recurring` transactions and for habitual same-price purchases (3 or more earlier identical amounts, e.g. a daily coffee). | `possible_duplicate` |
+| `category_spike` | This month's category spend is at least 1.5× its average over the previous 1–3 months and at least €30 above it. Needs 2 or more earlier months. | `spending_spike` |
+
+**Insufficient history.** A category is judged only after 5 earlier transactions in it. Categories
+below that are listed in the report's `notes` rather than compared with other categories. An
+earlier version fell back to "all spending", and the evaluation showed that this flagged every
+early rent payment as "30× your typical spending", so the fallback was removed. The report's
+`history_status` is `insufficient`, `limited` or `ok`.
+
+### 3.2 Alerts
+
+Flags are stored in the **existing `alerts` table**. `Alert` mirrors `database/SpendGPT.sql`
+column for column, and no schema change was made. `store_alerts()` avoids duplicates on
+re-analysis: transaction flags are keyed on (user, alert_type, related_transaction_id), and
+spikes on (user, type, category and month). No `is_anomaly` or `anomaly_reason` columns are
+added to `transactions`.
+
+### 3.3 Evaluation
+
+Run `python -m app.services.anomaly_eval` from `backend/`. It uses the 1,021 seed transactions
+across 5 users:
+
+* **Clean data:** 21 transactions (2.1%) flagged as unusually large, e.g. concert tickets in an
+  Entertainment history of cinema and pub visits.
+* **Injected over-spends:** 6 non-recurring transactions per user (30 total) set to *factor ×* that
+  user's median in the category:
+
+  | Factor | Precision | Recall | F1 |
+  |-------:|----------:|-------:|---:|
+  | 1.5× | — | 0.000 | — |
+  | 2× | 1.000 | 0.067 | 0.125 |
+  | 3× | 1.000 | 0.600 | 0.750 |
+  | 4× | 1.000 | 0.933 | 0.966 |
+  | 6× | 1.000 | 0.967 | 0.983 |
+
+  1.5× is deliberately *not* flagged, because it is within normal variation (for example, weekly
+  shops vary a lot). Injection is relative to the median, not the original amount, because
+  tripling a small €14 top-up gives a normal €43 grocery bill.
+* **Seeded alerts:** only 1 of the 12 `large_transaction` alerts in `database/alerts.csv` is also
+  flagged. Those seeded alerts appear to use a fixed amount threshold (e.g. "€57.37 at Amazon.ie"),
+  while this detector is relative to the user's own history.

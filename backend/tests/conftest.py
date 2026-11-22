@@ -98,7 +98,7 @@ SEED_CATEGORIES = [
 
 def reset_database(categories=SEED_CATEGORIES):
     """Drop and recreate every table, then seed the categories table."""
-    import app.models  # noqa: F401  (registers every model on Base.metadata)
+    import app.models  # noqa: F401  (registers every model, incl. Budget/Alert, on Base.metadata)
     from app.database import Base, SessionLocal, engine
     from app.models.category import Category
 
