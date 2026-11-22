@@ -6,17 +6,17 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
-
 class Transaction(Base):
     """Represents a user's financial transaction (one row per receipt)."""
 
     __tablename__ = "transactions"
+
     # same rule as SpendGPT.sql - a user can't save the same receipt twice
     __table_args__ = (UniqueConstraint("user_id", "receipt_hash", name="uq_user_receipt"),)
 
     transaction_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.category_id"), nullable=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.category_id", ondelete="SET NULL"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     merchant_name: Mapped[str] = mapped_column(String(100), nullable=False)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
