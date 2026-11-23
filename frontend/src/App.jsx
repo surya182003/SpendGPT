@@ -1,8 +1,8 @@
 import { Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import Login from "./pages/login";
+import Dashboard from "./pages/dashboard";
 import Profile from "./pages/profile";
-import Budget from "./pages/Budget";
+import Budget from "./pages/budget";
 import Signup from "./pages/signup";
 
 function App() {
