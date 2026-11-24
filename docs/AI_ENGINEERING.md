@@ -300,3 +300,48 @@ transaction if that is later, so a new user's income isn't counted for months wi
 * a cross-check against the seed transactions;
 * the LLM paths: the prompt contents, no personal data in the prompt, the offline fallback,
   rejected invented figures, and the advisor's chat history.
+
+---
+
+## 5. AI API (FastAPI)
+
+The AI endpoints are on the existing `/api/ai` router (`backend/app/controllers/ai_controller.py`), next
+to the existing receipt endpoints. Their schemas are in `backend/app/schemas/ai_schema.py`. They identify
+the user by `user_id`, like the rest of the API, and IDs are limited to `1..2147483647`. The React app
+calls only these endpoints and never LM Studio. In tests, LM Studio is replaced through
+`app.dependency_overrides[get_lmstudio_client]`.
+
+| Method & path | Purpose |
+|---------------|---------|
+| `GET /api/ai/status` | Whether LM Studio is reachable (`available`, `reason`, `models`). |
+| `POST /api/ai/categorize` | Suggests a category for `merchant_name`/`description`. Nothing is saved. Optional `user_id` (uses that user's history first) and `use_llm` (LM Studio for unknown merchants). |
+| `POST /api/ai/users/{user_id}/anomalies/scan?lookback_days=90` | Checks recent transactions and stores new flags as alerts, without duplicates. Returns the flags and `alerts_created`. |
+| `GET /api/ai/users/{user_id}/alerts?unread_only=false&limit=50` | The user's alerts, newest first. |
+| `PATCH /api/ai/users/{user_id}/alerts/{alert_id}/read` | Marks one of the user's alerts as read. |
+| `GET /api/ai/users/{user_id}/insights?months=6&explain=true` | The insights report (section 4). With `explain=true` it also includes `explanation` (`text`, `source`, `reason`). |
+| `POST /api/ai/users/{user_id}/chat` | Advisor. Body: `{"question": "...", "history": [{"role": "user"/"assistant", "content": "..."}], "months": 6}`. Returns `{answer, source, reason}`. |
+
+**Existing endpoints.** Request and response shapes are unchanged:
+
+* `POST /api/transactions/`: if no `category_id` is sent, the transaction is categorised from history,
+  rules or the ML model. The LLM is never used here, so saving never waits on a model, and unknown
+  merchants stay `NULL`.
+* `POST /api/receipts/upload`: categorised the same way, using `categorize_receipt`, which falls back
+  to the receipt's items when the merchant is unknown.
+* After either save, the new transaction is checked for unusual spending and any flags are stored in
+  `alerts`.
+* `PUT /api/transactions/{id}` doesn't recategorise, because the user's choice wins.
+
+Both automatic steps are in `app/services/ai_pipeline.py`. If one fails, it is logged and the save still
+succeeds.
+
+**Errors.**
+
+* 404: unknown user, or an alert belonging to someone else.
+* 422: invalid input, such as an empty or over-long question, an unknown chat role, more than 20 history
+  turns, `months` outside 1–24, or an out-of-range ID.
+* If LM Studio is down, the endpoints still return 200, with `source: "fallback"` and the reason.
+
+No tables or columns were added, and the queries are standard SQL that works on MySQL and TiDB.
+`tests/test_ai_api.py` tests every endpoint, the save-path integration and route conflicts. The
+endpoints are also covered by `pytest -m fuzz`.

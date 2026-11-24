@@ -8,6 +8,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.category import Category
 from app.schemas.transaction_schema import TransactionCreate, TransactionResponse
+from app.services.ai_pipeline import check_and_store_alerts, suggest_category_id
 
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -33,9 +34,14 @@ def create_transaction(user_id: int, payload: TransactionCreate, db: Session = D
                 detail="Category not found"
             )
 
+    # No category chosen: suggest one from the user's history, rules or the ML model.
+    category_id = payload.category_id
+    if category_id is None:
+        category_id = suggest_category_id(db, user_id, payload.merchant_name)
+
     transaction = Transaction(
         user_id=user_id,
-        category_id=payload.category_id,
+        category_id=category_id,
         amount=payload.amount,
         merchant_name=payload.merchant_name,
         transaction_date=payload.transaction_date,
@@ -53,6 +59,8 @@ def create_transaction(user_id: int, payload: TransactionCreate, db: Session = D
             "Invalid category_id"
         ) from None
 
+    # Unusual-spending check; flags are stored in the alerts table.
+    check_and_store_alerts(db, transaction)
     db.refresh(transaction)
 
     return transaction

@@ -650,7 +650,7 @@ def fallback_explanation(report: InsightsReport) -> str:
         return ("There are no transactions to analyse yet. Add your spending or upload a receipt and "
                 "SpendGPT will show where your money goes.")
     parts = [f"Over the last {report.months_covered:.1f} months you spent {fmt(report.total_spent)} "
-             f"across {report.transaction_count} transactions, about {fmt(report.average_monthly_spend)} a month."]
+             f"across {report.transaction_count} transaction{'s' if report.transaction_count != 1 else ''}, about {fmt(report.average_monthly_spend)} a month."]
     if report.net is not None:
         if report.net >= 0:
             parts.append(f"Your income for the period was {fmt(report.total_income)}, leaving {fmt(report.net)}.")
