@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginUser } from "../services/api";
 
 function Login() {
   const navigate = useNavigate();
@@ -7,7 +8,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     if (email === "" || password === "") {
@@ -16,7 +17,15 @@ function Login() {
     }
 
     setError("");
-    navigate("/dashboard");
+    try {
+      // the backend checks the password and gives back the user (with the user id)
+      const user = await loginUser(email, password);
+      sessionStorage.setItem("email", user.email);
+      sessionStorage.setItem("userId", user.user_id);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
@@ -186,7 +195,21 @@ function Login() {
             }}
           >
             New to SpendGPT?{" "}
-            <span style={{ color: "#8884d8" }}>Create account</span>
+              <button
+              type="button"
+              onClick={() => navigate("/signup")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "#8884d8",
+                fontSize: "13px",
+                cursor: "pointer",
+              }}
+            >
+              Create account
+            </button>
+            
           </p>
         </form>
       </div>
