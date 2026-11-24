@@ -13,16 +13,8 @@ from app.schemas.transaction_schema import TransactionCreate, TransactionRespons
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 
-@router.post(
-    "/",
-    response_model=TransactionResponse,
-    status_code=status.HTTP_201_CREATED
-)
-def create_transaction(
-    user_id: int,
-    payload: TransactionCreate,
-    db: Session = Depends(get_db)
-):
+@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+def create_transaction(user_id: int, payload: TransactionCreate, db: Session = Depends(get_db)):
     # Check whether the user exists
     user = db.get(User, user_id)
 
@@ -66,14 +58,8 @@ def create_transaction(
     return transaction
 
 
-@router.get(
-    "/user/{user_id}",
-    response_model=list[TransactionResponse]
-)
-def get_user_transactions(
-    user_id: int,
-    db: Session = Depends(get_db)
-):
+@router.get("/user/{user_id}", response_model=list[TransactionResponse])
+def get_user_transactions(user_id: int, db: Session = Depends(get_db)):
     user = db.get(User, user_id)
 
     if user is None:
@@ -93,15 +79,14 @@ def get_user_transactions(
     return transactions
 
 
-@router.get(
-    "/{transaction_id}",
-    response_model=TransactionResponse
-)
-def get_transaction(
-    transaction_id: int,
-    db: Session = Depends(get_db)
-):
-    transaction = db.get(Transaction, transaction_id)
+@router.get("/{transaction_id}", response_model=TransactionResponse)
+def get_transaction(transaction_id: int, user_id: int, db: Session = Depends(get_db)):
+    statement = select(Transaction).where(
+        Transaction.transaction_id == transaction_id,
+        Transaction.user_id == user_id
+    )
+
+    transaction = db.scalar(statement)
 
     if transaction is None:
         raise HTTPException(
@@ -111,13 +96,58 @@ def get_transaction(
 
     return transaction
 
+@router.put("/{transaction_id}", response_model=TransactionResponse)
+def update_transaction(transaction_id: int, user_id: int, payload: TransactionCreate, db: Session = Depends(get_db)):
+    statement = select(Transaction).where(
+        Transaction.transaction_id == transaction_id,
+        Transaction.user_id == user_id
+    )
+
+    transaction = db.scalar(statement)
+
+    if transaction is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Transaction not found"
+        )
+
+    if payload.category_id is not None:
+        category = db.get(Category, payload.category_id)
+
+        if category is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "Category not found"
+            )
+
+    transaction.category_id = payload.category_id
+    transaction.amount = payload.amount
+    transaction.merchant_name = payload.merchant_name
+    transaction.transaction_date = payload.transaction_date
+    transaction.is_recurring = payload.is_recurring
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Transaction could not be updated"
+        ) from None
+
+    db.refresh(transaction)
+
+    return transaction
+
 
 @router.delete("/{transaction_id}")
-def delete_transaction(
-    transaction_id: int,
-    db: Session = Depends(get_db)
-):
-    transaction = db.get(Transaction, transaction_id)
+def delete_transaction(transaction_id: int, user_id: int, db: Session = Depends(get_db)):
+    statement = select(Transaction).where(
+        Transaction.transaction_id == transaction_id,
+        Transaction.user_id == user_id
+    )
+
+    transaction = db.scalar(statement)
 
     if transaction is None:
         raise HTTPException(

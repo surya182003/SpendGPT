@@ -1,7 +1,8 @@
 # Endpoints for the AI / LLM side of the project.
 # They return the receipts saved from OCR as plain JSON so the model can use them directly.
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException, status, Path, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -41,17 +42,34 @@ def receipt_to_dict(transaction):
 
 
 @router.get("/receipts/{transaction_id}", response_model=ReceiptOut)
-def get_receipt(transaction_id: int, db: Session = Depends(get_db)):
-    transaction = db.get(Transaction, transaction_id)
+def get_receipt(
+    transaction_id: Annotated[int, Path(gt=0, le=2_147_483_647)],
+    user_id: Annotated[int, Query(gt=0, le=2_147_483_647)],
+    db: Session = Depends(get_db),
+):
+    statement = select(Transaction).where(
+        Transaction.transaction_id == transaction_id,
+        Transaction.user_id == user_id,
+        Transaction.receipt_hash.is_not(None)
+    )
+
+    transaction = db.scalar(statement)
 
     if transaction is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Receipt not found")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Receipt not found"
+        )
 
     return receipt_to_dict(transaction)
 
 
 @router.get("/users/{user_id}/receipts", response_model=list[ReceiptOut])
-def get_user_receipts(user_id: int, limit: int = 50, db: Session = Depends(get_db)):
+def get_user_receipts(
+    user_id: Annotated[int, Path(gt=0, le=2_147_483_647)],
+    limit: Annotated[int, Query(ge=0, le=200)] = 50,
+    db: Session = Depends(get_db),
+):
     if db.get(User, user_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
 
