@@ -246,3 +246,57 @@ across 5 users:
 * **Seeded alerts:** only 1 of the 12 `large_transaction` alerts in `database/alerts.csv` is also
   flagged. Those seeded alerts appear to use a fixed amount threshold (e.g. "€57.37 at Amazon.ie"),
   while this detector is relative to the user's own history.
+
+---
+
+## 4. Financial insights and AI advisor
+
+`backend/app/services/insights_service.py`
+
+### 4.1 Design
+
+Python calculates every figure from the user's own rows in the existing `users`, `transactions`,
+`categories` and `budgets` tables. LM Studio only puts those figures into words. No tables or
+columns were added.
+
+| Insight | How it is calculated |
+|---------|----------------------|
+| Income | `users.monthly_income` × months covered, with the current month pro-rated. Transactions are all spending, so this is the only income source in the schema. If income is not set, income, net and savings rate are `None` and a note says so. |
+| Spending | Sum of the user's transactions in the period. Transactions dated after today are ignored. |
+| By category | Total, share, transaction count, monthly average and recurring share per category. Transactions without a category are grouped as "Uncategorised". The essential/discretionary split comes from `categories.spend_type`. |
+| Highest categories | The top 3 categories by total. |
+| Monthly pattern | Every calendar month in the period, including months with no spending. Also: the average over complete months, the highest and lowest month, the trend (the last complete month vs. the earlier ones, ±10%), and the projected total for the current month. |
+| Budgets | Each budget overlapping the period, compared with the spending in its own dates and category (a NULL category means all spending). Status is `over`, `at_risk` (≥ 80% used, or projected to go over at the current pace) or `on_track`. |
+| Savings opportunities | Over-budget categories; non-essential categories averaging at least €25 a month (a suggested 20% cut); frequent small purchases (6 or more of €12 or less at one merchant); recurring non-essential payments. |
+| Recommendations | Rule-based and prioritised (`high`, `medium`, `low`) from the figures above. |
+
+The period defaults to 6 months (at most 24). It starts at the month of the user's first
+transaction if that is later, so a new user's income isn't counted for months with no data.
+`history_status` is `empty`, `limited` (fewer than 10 transactions or under 2 months) or `ok`.
+
+### 4.2 LM Studio explanations and the advisor
+
+* `explain_insights` / `aexplain_insights` write a short plain-language summary of the report.
+* `ask_advisor` / `aask_advisor` answer the student's question using the report's figures.
+  Earlier chat turns can be passed in; only the last 6 `user`/`assistant` turns are sent, and any
+  other roles are dropped. Questions must be 1–500 characters.
+* Only aggregates go to the model (`llm_facts`): no names, emails, merchants or individual
+  transactions.
+* **Figure check.** The model is told to use only the given figures. `unsupported_figures` also
+  checks every amount and percentage in the reply against the report (a 1% or ±1 rounding
+  difference is allowed). A reply with an invented figure is replaced by the template text, with
+  reason `unverified_figures`.
+* **Fallback.** If LM Studio is disabled, offline or returns an error, a template summary built
+  from the same figures is returned. The result is an `AIText` with `source` set to `llm` or
+  `fallback`, and a `reason`.
+
+### 4.3 Tests
+
+`tests/test_insights.py` covers:
+
+* the totals, category, monthly and budget calculations;
+* user isolation and missing data (no transactions, no income, no category, future dates);
+* savings opportunities and recommendations;
+* a cross-check against the seed transactions;
+* the LLM paths: the prompt contents, no personal data in the prompt, the offline fallback,
+  rejected invented figures, and the advisor's chat history.
