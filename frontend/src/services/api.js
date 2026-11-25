@@ -4,7 +4,7 @@ const API_URL = "http://localhost:8000";
 
 // Sends the request and returns the JSON the backend answers with
 // If something goes wrong it throws an Error with a message we can show on screen
-async function request(path, options) {
+export async function request(path, options) {
   let response;
   try {
     response = await fetch(API_URL + path, options);

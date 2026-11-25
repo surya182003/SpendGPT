@@ -345,3 +345,41 @@ succeeds.
 No tables or columns were added, and the queries are standard SQL that works on MySQL and TiDB.
 `tests/test_ai_api.py` tests every endpoint, the save-path integration and route conflicts. The
 endpoints are also covered by `pytest -m fuzz`.
+
+---
+
+## 6. React frontend
+
+The AI features live on the existing dashboard (`frontend/src/pages/dashboard.jsx`) and follow the
+team's frontend conventions: the logged-in user comes from `sessionStorage.userId` (set by login and
+sign-up), API calls live in `src/services/`, and styling uses the same inline dark palette.
+React never calls LM Studio. Every request goes to FastAPI's `/api/ai/*` endpoints.
+
+| File | Purpose |
+|------|---------|
+| `src/services/ai.js` | AI API client (status, insights, advisor chat, anomaly scan, alerts, category prediction) and small display helpers. Reuses the team's `request()` from `api.js` for error handling. |
+| `src/components/ai/AIStatusBadge.jsx` | Shows whether the local model is online, or that summaries are being used because it is offline. |
+| `src/components/ai/InsightsPanel.jsx` | AI summary (labelled as written by the local model or as a figures-based summary), key figures, category breakdown, budget use with warnings, recommendations. |
+| `src/components/ai/UnusualSpending.jsx` | Runs the anomaly scan, shows each flag with its explanation, lists unread alerts with "Mark read". |
+| `src/components/ai/AdvisorChat.jsx` | The AI financial advisor chat, with suggested questions and conversation history. Replaces the placeholder chat box. |
+| `src/components/ai/CategoryPredictor.jsx` | Type a merchant and see the predicted category, its confidence and why. |
+
+The dashboard changes:
+
+* **Charts:** "Spending by Category" and "Monthly Spending" now plot the figures from
+  `GET /api/ai/users/{id}/insights`, replacing the sample data marked "replace with real data from
+  backend when available".
+* **Receipt upload:** the success message also shows the category assigned by the AI.
+
+Every component has a loading state, an error state with a retry, and an empty state. No financial
+value is hardcoded.
+
+### Tests and checks
+
+```bash
+cd frontend
+npm ci
+npm test         # node:test, mocked fetch: request paths/bodies, error messages, display helpers
+npm run lint     # oxlint
+npm run build
+```
