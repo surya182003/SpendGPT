@@ -8,6 +8,7 @@ import io
 import json
 import sys
 import traceback
+from datetime import date
 
 # Load environment variables for DB connection
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -95,7 +96,7 @@ def save_receipt_to_db(parsed_result, user_id):
         # Extract fields from parsed result (adjust keys based on your parser output)
         merchant = parsed_result.get("merchant_name", "Unknown Store")
         total_amount = parsed_result.get("total_amount", 0.0)
-        txn_date = parsed_result.get("date", "2026-11-19")
+        txn_date = parsed_result.get("transaction_date") or date.today().isoformat() # my bad was earlier using just date which was not really fetting transaction date from the receipt, so changed it to get the transaction date from the parsed result, if not present then use today's date.
         receipt_hash = parsed_result.get("receipt_hash", "ocr_manual_hash")
         items = parsed_result.get("items", [])
 
