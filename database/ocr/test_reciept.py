@@ -1,6 +1,10 @@
+from decimal import Decimal
+
+from money import parse_money
 from receipt_parser import parse_receipt_text
 from validation import validate_receipt
 
+#ive used parsed receipt text to validate the receipt and check for total amount, items, and issues.
 LIDL = """
 L
 DI
@@ -96,8 +100,8 @@ Please retain receipt
 Date: 12/10/26
 """
 
-# Real Aldi OCR output: split "T o t a 1" label, split "3 X 0.79" quantity
-# line that comes BEFORE its product, Cyrillic look-alike letters,
+# Real aldi OCR output: split "T o t a 1" label, split "3 X 0.79" quantity
+# line that comes BEFORE its product, cyrillic look-alike letters,
 # "0.79 0" (tax code E misread as 0), and a code followed by "6PK".
 ALDI = (
     "Aldi Stores (Ireland) Ltd\nElysian\nCork\nEUR\n"
@@ -118,6 +122,22 @@ ALDI = (
     "07/10/26\nSALE\nGoods: 13.61\nTotal: EUR13.61\nAPPROVED\n"
     "Authorisation Code: 416630\nCUSTOMER COPY\n"
 )
+
+# Large total with a thousands separator 
+BIG = """
+TV Stand
+1,299.00 A
+TOTAL
+1,299.00
+Card Sales EUR 1,299.00
+"""
+
+BIG_EU = """
+TV Stand
+1.299,00 A
+TOTAL
+1.299,00
+"""
 
 
 def show(name, text):
@@ -150,5 +170,33 @@ assert any(i["item_name"] == "TOMATO KETCHUP" for i in aldi["items"])
 # A lone price must never become the total.
 no_total = validate_receipt(parse_receipt_text("Milk\n1.15 A\nBread\n1.89 A\n"))
 assert no_total["total_amount"] is None and no_total["requires_review"]
+
+# parse_money: thousands separators 
+assert parse_money("1,234.56") == Decimal("1234.56")
+assert parse_money("1.234,56") == Decimal("1234.56")
+assert parse_money("1,234,567.89") == Decimal("1234567.89")
+assert parse_money("13,61") == Decimal("13.61")
+assert parse_money("13.61") == Decimal("13.61")
+assert parse_money("EUR 1,234.56") == Decimal("1234.56")
+assert parse_money("abc") is None
+
+# Large totals end to end
+for name, text in (("big", BIG), ("big_eu", BIG_EU)):
+    r = show(name, text)
+    assert r["total_amount"] == 1299.0 and len(r["items"]) == 1
+    assert not r["requires_review"], r["validation_issues"]
+
+# Negative totals (refunds) check: "Total -3.00" or "Total: -3.00" or "Total:-3.00" or "Total EUR-3.00"
+from totals import extract_total
+
+for line in ("Total -3.00", "Total: -3.00", "Total:-3.00", "Total EUR-3.00"):
+    assert extract_total([line]) == (None, None), line
+
+assert extract_total(["Total - 3.00"]) == (Decimal("3.00"), "total")
+assert extract_total(["Total: 3.00"]) == (Decimal("3.00"), "total")
+assert extract_total(["Total 3.00"]) == (Decimal("3.00"), "total")
+
+refund = validate_receipt(parse_receipt_text("Milk\n1.15 A\nTotal -1.15\n"))
+assert refund["total_amount"] is None and refund["requires_review"]
 
 print("all good")

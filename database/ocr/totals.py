@@ -38,7 +38,7 @@ def _labelled_amount(lines, index, label):
     line = lines[index]
 
     same_line = re.fullmatch(
-        rf"(?:{label})\s*[:\-]?\s*(?:{CUR}\s*)?(?P<a>{SIGNED_AMT})(?:\s*{CUR})?",
+        rf"(?:{label})\s*(?::|-(?=\s))?\s*(?:{CUR}\s*)?(?P<a>{SIGNED_AMT})(?:\s*{CUR})?",
         line,
         re.IGNORECASE,
     )
