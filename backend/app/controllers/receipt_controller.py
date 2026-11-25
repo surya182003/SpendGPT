@@ -14,6 +14,7 @@ from app.models.receipt_item import ReceiptItem
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.receipt_schema import ReceiptUploadResponse
+from app.services.ai_pipeline import check_and_store_alerts, suggest_category_id
 from app.services.ocr_service import read_receipt
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
@@ -93,6 +94,7 @@ def upload_receipt(
 
     transaction = Transaction(
         user_id=user_id,
+        category_id=suggest_category_id(db, user_id, result["merchant_name"], result["items"]),
         amount=Decimal(str(result["total_amount"])),
         merchant_name=merchant[:100],
         transaction_date=date.fromisoformat(result["transaction_date"]),
@@ -119,6 +121,7 @@ def upload_receipt(
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "This receipt was already uploaded") from None
 
+    check_and_store_alerts(db, transaction)
     db.refresh(transaction)
 
     response = receipt_to_dict(transaction)

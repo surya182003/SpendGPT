@@ -144,8 +144,10 @@ class FakeLMStudio:
 
     def status(self):
         if not self.available:
-            return {"available": False, "reason": "connection", "models": [], "configured_model": None}
-        return {"available": True, "reason": None, "models": ["fake-model"], "configured_model": None}
+            return {"available": False, "reason": "connection", "models": [], "configured_model": None,
+                    "active_model": None}
+        return {"available": True, "reason": None, "models": ["fake-model"], "configured_model": None,
+                "active_model": "fake-model"}
 
     def chat(self, messages, **kwargs):
         self.calls.append(messages)

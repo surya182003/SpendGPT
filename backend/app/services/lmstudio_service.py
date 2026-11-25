@@ -148,12 +148,66 @@ class LMStudioClient:
 
     @staticmethod
     def _pick_model(models: list[str]) -> str:
+        """Fallback when LM Studio's own model list is unavailable: first non-embedding id."""
         chat_models = [m for m in models if "embed" not in m.lower()]
         if not chat_models:
             raise LMStudioModelError(
                 "No chat model is available in LM Studio. Download one and load it (see docs/AI_ENGINEERING.md)."
             )
         return chat_models[0]
+
+    def _native_models_url(self) -> str | None:
+        """LM Studio's own REST list (/api/v0/models), which says each model's type and state."""
+        return self.base_url[: -len("/v1")] + "/api/v0/models" if self.base_url.endswith("/v1") else None
+
+    @staticmethod
+    def _pick_native(data) -> str | None:
+        """Best chat model from /api/v0/models: loaded first, then the largest context window.
+
+        The OpenAI-style /v1/models list can't tell models apart. LM Studio may list small
+        helper models (e.g. a 40M-parameter "phonon" model with a 2k context) before the
+        real chat model, and with just-in-time loading it lists every downloaded model.
+        """
+        models = data.get("data") if isinstance(data, dict) else None
+        if not isinstance(models, list):
+            return None
+        chat = [m for m in models if isinstance(m, dict) and m.get("id") and m.get("type") in ("llm", "vlm")]
+        if not chat:
+            return None
+        best = max(chat, key=lambda m: (m.get("state") == "loaded",
+                                        m.get("loaded_context_length") or m.get("max_context_length") or 0))
+        return best["id"]
+
+    def _native_pick_sync(self) -> str | None:
+        url = self._native_models_url()
+        if not url:
+            return None
+        try:
+            with self._sync_client() as http:
+                response = http.get(url)
+            return self._pick_native(response.json()) if response.status_code < 400 else None
+        except (httpx.HTTPError, ValueError):
+            return None
+
+    async def _native_pick_async(self) -> str | None:
+        url = self._native_models_url()
+        if not url:
+            return None
+        try:
+            async with self._async_client() as http:
+                response = await http.get(url)
+            return self._pick_native(response.json()) if response.status_code < 400 else None
+        except (httpx.HTTPError, ValueError):
+            return None
+
+    def resolve_model(self) -> str:
+        """The model chat requests will use: LM_STUDIO_MODEL, else the best loaded chat model."""
+        self._check_enabled()
+        return self.model or self._native_pick_sync() or self._pick_model(self.list_models())
+
+    async def aresolve_model(self) -> str:
+        self._check_enabled()
+        return self.model or await self._native_pick_async() or self._pick_model(await self.alist_models())
 
     @staticmethod
     def _payload(model, messages, temperature, max_tokens, response_format) -> dict:
@@ -194,7 +248,8 @@ class LMStudioClient:
         return data
 
     @staticmethod
-    def _status(models: list[str], configured: str, error: LMStudioError | None) -> dict:
+    def _status(models: list[str], configured: str, error: LMStudioError | None,
+                active: str | None = None) -> dict:
         reason = error.reason if error else None
         if not error and configured and configured not in models:
             # With JIT loading LM Studio may still load it on demand, so report, don't fail.
@@ -206,6 +261,7 @@ class LMStudioClient:
             "reason": reason,
             "models": models,
             "configured_model": configured or None,
+            "active_model": active if error is None and reason is None else None,
         }
 
     # -- sync API -------------------------------------------------------------------
@@ -225,14 +281,19 @@ class LMStudioClient:
 
     def status(self) -> dict:
         try:
-            return self._status(self.list_models(), self.model, None)
+            models = self.list_models()
         except LMStudioError as exc:
             return self._status([], self.model, exc)
+        try:
+            active = self.resolve_model()
+        except LMStudioError:
+            active = None
+        return self._status(models, self.model, None, active)
 
     def chat(self, messages: list[dict], temperature: float = 0.3, max_tokens: int = 600,
              response_format: dict | None = None) -> str:
         self._check_enabled()
-        model = self.model or self._pick_model(self.list_models())
+        model = self.resolve_model()
         payload = self._payload(model, messages, temperature, max_tokens, response_format)
         try:
             with self._sync_client() as http:
@@ -263,14 +324,19 @@ class LMStudioClient:
 
     async def astatus(self) -> dict:
         try:
-            return self._status(await self.alist_models(), self.model, None)
+            models = await self.alist_models()
         except LMStudioError as exc:
             return self._status([], self.model, exc)
+        try:
+            active = await self.aresolve_model()
+        except LMStudioError:
+            active = None
+        return self._status(models, self.model, None, active)
 
     async def achat(self, messages: list[dict], temperature: float = 0.3, max_tokens: int = 600,
                     response_format: dict | None = None) -> str:
         self._check_enabled()
-        model = self.model or self._pick_model(await self.alist_models())
+        model = await self.aresolve_model()
         payload = self._payload(model, messages, temperature, max_tokens, response_format)
         try:
             async with self._async_client() as http:

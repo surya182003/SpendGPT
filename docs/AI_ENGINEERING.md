@@ -88,7 +88,19 @@ uvicorn app.main:app --reload --env-file .env
 * `list_models()` / `alist_models()`: `GET /v1/models`
 * `chat()` / `achat()`: `POST /v1/chat/completions` (sync and async)
 * `chat_json()` / `achat_json()`: structured output using a JSON schema (`response_format`)
-* `status()` / `astatus()`: availability summary for `GET /api/ai/status`
+* `status()` / `astatus()`: availability summary for `GET /api/ai/status`, including
+  `active_model` (the model chat requests will use)
+* `resolve_model()` / `aresolve_model()`: which model to use (see below)
+
+**Model choice.** If `LM_STUDIO_MODEL` is set, that model is used. Otherwise the client reads
+LM Studio's own list (`GET /api/v0/models`), which gives each model's type and state, and picks
+the **loaded chat model (`llm`/`vlm`) with the largest context window**. The OpenAI-style
+`/v1/models` list can't tell models apart: in testing, LM Studio listed a small built-in model
+(`phonon-40m-multilingual`, type `llm`, 2k context) before the real chat model, and with
+just-in-time loading it lists every downloaded model. Picking the first entry would send
+chat requests to the wrong model. If `/api/v0/models` isn't available (another
+OpenAI-compatible server), the first non-embedding model is used. Setting `LM_STUDIO_MODEL`
+explicitly is still recommended.
 
 It also does the following:
 
@@ -246,3 +258,168 @@ across 5 users:
 * **Seeded alerts:** only 1 of the 12 `large_transaction` alerts in `database/alerts.csv` is also
   flagged. Those seeded alerts appear to use a fixed amount threshold (e.g. "€57.37 at Amazon.ie"),
   while this detector is relative to the user's own history.
+
+---
+
+## 4. Financial insights and AI advisor
+
+`backend/app/services/insights_service.py`
+
+### 4.1 Design
+
+Python calculates every figure from the user's own rows in the existing `users`, `transactions`,
+`categories` and `budgets` tables. LM Studio only puts those figures into words. No tables or
+columns were added.
+
+| Insight | How it is calculated |
+|---------|----------------------|
+| Income | `users.monthly_income` × months covered, with the current month pro-rated. Transactions are all spending, so this is the only income source in the schema. If income is not set, income, net and savings rate are `None` and a note says so. |
+| Spending | Sum of the user's transactions in the period. Transactions dated after today are ignored. |
+| By category | Total, share, transaction count, monthly average and recurring share per category. Transactions without a category are grouped as "Uncategorised". The essential/discretionary split comes from `categories.spend_type`. |
+| Highest categories | The top 3 categories by total. |
+| Monthly pattern | Every calendar month in the period, including months with no spending. Also: the average over complete months, the highest and lowest month, the trend (the last complete month vs. the earlier ones, ±10%), and the projected total for the current month. |
+| Budgets | Each budget overlapping the period, compared with the spending in its own dates and category (a NULL category means all spending). Status is `over`, `at_risk` (≥ 80% used, or projected to go over at the current pace) or `on_track`. |
+| Savings opportunities | Over-budget categories; non-essential categories averaging at least €25 a month (a suggested 20% cut); frequent small purchases (6 or more of €12 or less at one merchant); recurring non-essential payments. |
+| Recommendations | Rule-based and prioritised (`high`, `medium`, `low`) from the figures above. |
+
+The period defaults to 6 months (at most 24). It starts at the month of the user's first
+transaction if that is later, so a new user's income isn't counted for months with no data.
+`history_status` is `empty`, `limited` (fewer than 10 transactions or under 2 months) or `ok`.
+
+### 4.2 LM Studio explanations and the advisor
+
+* `explain_insights` / `aexplain_insights` write a short plain-language summary of the report.
+* `ask_advisor` / `aask_advisor` answer the student's question. Questions must be 1–500
+  characters.
+* **Common questions are answered directly from the figures** (`direct_answer`, `source:
+  "computed"`), with no LLM call. Questions are matched by keyword, with category synonyms such as
+  "takeaway" → Eating Out and "supermarket" → Groceries:
+
+  | Question type | Example | Answer uses |
+  |---------------|---------|-------------|
+  | top category | "Where am I spending most of my money?" | period totals per category + this month's top |
+  | one category | "How much did I spend on groceries this month / last month?" | this month so far, last month's total, that category's budget |
+  | budgets | "Am I exceeding my monthly budget?" | active budgets only: over, at risk, on track |
+  | biggest increase | "Which spending category increased the most?" | last two complete months, per category |
+  | saving | "How can I reduce unnecessary expenses?" | the top 3 savings opportunities |
+
+  An earlier version let LM Studio answer these from the full figures. Tested on seed user 1 with
+  `qwen2.5-coder-7b-instruct`, it got 3 of 5 wrong: it reported 6 months of groceries as "this
+  month", called monthly income a budget, and invented a category increase. Asking the model only
+  to rephrase a computed answer didn't work either. It dropped figures or added unsupported claims
+  ("you already spent more than planned in October"). Computed answers are correct and instant.
+* **Other questions** ("Give me an overview", "Am I saving enough?") go to LM Studio with the full
+  figures. Earlier chat turns can be passed in; only the last 6 `user`/`assistant` turns are sent,
+  and any other roles are dropped.
+* The figures sent to the model include this month per category, the per-category change between
+  the last two complete months, and **only currently active budgets**. Ended budgets are reduced
+  to a count, and the prompt states that monthly income is not a budget.
+* Only aggregates go to the model (`llm_facts`): no names, emails, merchants or individual
+  transactions.
+* **Figure check.** The model is told to use only the given figures. `unsupported_figures` also
+  checks every amount and percentage in the reply against the report (a 1% or ±1 rounding
+  difference is allowed). A reply with an invented figure is replaced by the template text, with
+  reason `unverified_figures`.
+* **Fallback.** If LM Studio is disabled, offline or returns an error, a template summary built
+  from the same figures is returned. The result is an `AIText` with `source` set to `llm`,
+  `computed` or `fallback`, and a `reason`.
+* **Known limitation.** The figure check confirms that every number in a free-form reply exists
+  in the data, not that it is used for the right thing. For example, a summary once gave a monthly
+  range using two real but wrong months. Recognised questions avoid this by not using the LLM.
+
+### 4.3 Tests
+
+`tests/test_insights.py` covers:
+
+* the totals, category, monthly and budget calculations;
+* user isolation and missing data (no transactions, no income, no category, future dates);
+* savings opportunities and recommendations;
+* a cross-check against the seed transactions;
+* the LLM paths: the prompt contents, no personal data in the prompt, the offline fallback,
+  rejected invented figures, and the advisor's chat history;
+* the advisor's computed answers to each example question, on a small hand-checked dataset
+  (this month vs whole period, last month, synonyms, active vs ended budgets, biggest increase,
+  savings, too little history, no budgets, unrecognised questions going to the LLM).
+
+---
+
+## 5. AI API (FastAPI)
+
+The AI endpoints are on the existing `/api/ai` router (`backend/app/controllers/ai_controller.py`), next
+to the existing receipt endpoints. Their schemas are in `backend/app/schemas/ai_schema.py`. They identify
+the user by `user_id`, like the rest of the API, and IDs are limited to `1..2147483647`. The React app
+calls only these endpoints and never LM Studio. In tests, LM Studio is replaced through
+`app.dependency_overrides[get_lmstudio_client]`.
+
+| Method & path | Purpose |
+|---------------|---------|
+| `GET /api/ai/status` | Whether LM Studio is reachable (`available`, `reason`, `models`). |
+| `POST /api/ai/categorize` | Suggests a category for `merchant_name`/`description`. Nothing is saved. Optional `user_id` (uses that user's history first) and `use_llm` (LM Studio for unknown merchants). |
+| `POST /api/ai/users/{user_id}/anomalies/scan?lookback_days=90` | Checks recent transactions and stores new flags as alerts, without duplicates. Returns the flags and `alerts_created`. |
+| `GET /api/ai/users/{user_id}/alerts?unread_only=false&limit=50` | The user's alerts, newest first. |
+| `PATCH /api/ai/users/{user_id}/alerts/{alert_id}/read` | Marks one of the user's alerts as read. |
+| `GET /api/ai/users/{user_id}/insights?months=6&explain=true` | The insights report (section 4). With `explain=true` it also includes `explanation` (`text`, `source`, `reason`). |
+| `POST /api/ai/users/{user_id}/chat` | Advisor. Body: `{"question": "...", "history": [{"role": "user"/"assistant", "content": "..."}], "months": 6}`. Returns `{answer, source, reason}`. |
+
+**Existing endpoints.** Request and response shapes are unchanged:
+
+* `POST /api/transactions/`: if no `category_id` is sent, the transaction is categorised from history,
+  rules or the ML model. The LLM is never used here, so saving never waits on a model, and unknown
+  merchants stay `NULL`.
+* `POST /api/receipts/upload`: categorised the same way, using `categorize_receipt`, which falls back
+  to the receipt's items when the merchant is unknown.
+* After either save, the new transaction is checked for unusual spending and any flags are stored in
+  `alerts`.
+* `PUT /api/transactions/{id}` doesn't recategorise, because the user's choice wins.
+
+Both automatic steps are in `app/services/ai_pipeline.py`. If one fails, it is logged and the save still
+succeeds.
+
+**Errors.**
+
+* 404: unknown user, or an alert belonging to someone else.
+* 422: invalid input, such as an empty or over-long question, an unknown chat role, more than 20 history
+  turns, `months` outside 1–24, or an out-of-range ID.
+* If LM Studio is down, the endpoints still return 200, with `source: "fallback"` and the reason.
+
+No tables or columns were added, and the queries are standard SQL that works on MySQL and TiDB.
+`tests/test_ai_api.py` tests every endpoint, the save-path integration and route conflicts. The
+endpoints are also covered by `pytest -m fuzz`.
+
+---
+
+## 6. React frontend
+
+The AI features live on the existing dashboard (`frontend/src/pages/dashboard.jsx`) and follow the
+team's frontend conventions: the logged-in user comes from `sessionStorage.userId` (set by login and
+sign-up), API calls live in `src/services/`, and styling uses the same inline dark palette.
+React never calls LM Studio. Every request goes to FastAPI's `/api/ai/*` endpoints.
+
+| File | Purpose |
+|------|---------|
+| `src/services/ai.js` | AI API client (status, insights, advisor chat, anomaly scan, alerts, category prediction) and small display helpers. Reuses the team's `request()` from `api.js` for error handling. |
+| `src/components/ai/AIStatusBadge.jsx` | Shows whether the local model is online, or that summaries are being used because it is offline. |
+| `src/components/ai/InsightsPanel.jsx` | AI summary (labelled as written by the local model or as a figures-based summary), key figures, category breakdown, budget use with warnings, recommendations. |
+| `src/components/ai/UnusualSpending.jsx` | Runs the anomaly scan, shows each flag with its explanation, lists unread alerts with "Mark read". |
+| `src/components/ai/AdvisorChat.jsx` | The AI financial advisor chat, with suggested questions and conversation history. Replaces the placeholder chat box. |
+| `src/components/ai/CategoryPredictor.jsx` | Type a merchant and see the predicted category, its confidence and why. |
+
+The dashboard changes:
+
+* **Charts:** "Spending by Category" and "Monthly Spending" now plot the figures from
+  `GET /api/ai/users/{id}/insights`, replacing the sample data marked "replace with real data from
+  backend when available".
+* **Receipt upload:** the success message also shows the category assigned by the AI.
+
+Every component has a loading state, an error state with a retry, and an empty state. No financial
+value is hardcoded.
+
+### Tests and checks
+
+```bash
+cd frontend
+npm ci
+npm test         # node:test, mocked fetch: request paths/bodies, error messages, display helpers
+npm run lint     # oxlint
+npm run build
+```
