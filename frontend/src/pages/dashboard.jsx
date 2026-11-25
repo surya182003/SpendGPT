@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { uploadReceipt } from "../services/api";
 import {
   PieChart,
   Pie,
@@ -12,6 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+//sample data for charts replace with real data from backend when available
 const weeklyExpenses = [
   { name: "Food", value: 40 },
   { name: "Transport", value: 20 },
@@ -27,42 +29,72 @@ const monthlyExpenses = [
 ];
 
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042"];
+const buttonStyle = {
+  padding: "10px 16px",
+  borderRadius: "6px",
+  fontSize: "14px",
+  cursor: "pointer",
+};
+const purpleButton = { ...buttonStyle, background: "#8884d8", color: "white", border: "1px solid #8884d8" };
+const darkButton = { ...buttonStyle, background: "#151518", color: "#F2F1ED", border: "1px solid #232328" };
 
 function Dashboard() {
   const navigate = useNavigate();
-  const [showProfilePage, setShowProfilePage] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const location = useLocation();
+  // the profile page can open the dashboard with the chat box already open
+  const [showChat, setShowChat] = useState(location.state?.openChat === true);
   const [chatMessage, setChatMessage] = useState("");
   const [receiptImage, setReceiptImage] = useState(null);
 
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
+
   function handleReceiptSelect(e) {
     const file = e.target.files[0];
+    e.target.value = ""; // so the same file can be picked again later
     if (file) {
+      setReceiptFile(file);
       setReceiptImage(URL.createObjectURL(file));
+      setMessage("");
     }
   }
 
-  if (showProfilePage) {
-    return (
-      <div
-        style={{
-          width: "100%",
-          minHeight: "100vh",
-          boxSizing: "border-box",
-          padding: "40px 5%",
-          background: "#0A0A0C",
-          color: "#F2F1ED",
-        }}
-      >
-        <h2>Profile</h2>
-        <button onClick={() => setShowProfilePage(false)}>
-          ← Back to Dashboard
-        </button>
-        <div style={{ marginTop: "30px" }}>
-          <button onClick={() => navigate("/")}>Log Out</button>
-        </div>
-      </div>
-    );
+  // hides the picture and the buttons, so the dashboard looks normal again
+  function handleReceiptRemove() {
+    setReceiptImage(null);
+    setReceiptFile(null);
+  }
+
+  // shows a short message under the Scan Receipt button for a few seconds
+  function showMessage(text, isError) {
+    setMessage(text);
+    setMessageIsError(isError);
+    setTimeout(() => setMessage(""), 8000);
+  }
+
+  async function handleProcessReceipt() {
+    const userId = sessionStorage.getItem("userId");
+    if (!userId) {
+      navigate("/");
+      return;
+    }
+
+    setProcessing(true);
+    setMessage("");
+    try {
+      const receipt = await uploadReceipt(userId, receiptFile);
+      handleReceiptRemove();
+      let text = "Receipt saved: " + receipt.merchant_name + " · €" + receipt.total_amount.toFixed(2);
+      if (receipt.requires_review) {
+        text = text + " (please double-check it)";
+      }
+      showMessage(text, false);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+    setProcessing(false);
   }
 
   return (
@@ -78,7 +110,7 @@ function Dashboard() {
       }}
     >
       <button
-        onClick={() => setShowProfilePage(true)}
+        onClick={() => navigate("/profile")}
         style={{
           position: "absolute",
           top: "20px",
@@ -119,12 +151,22 @@ function Dashboard() {
               style={{ maxWidth: "200px", maxHeight: "200px", borderRadius: "6px" }}
             />
             <br />
-            <button
-              onClick={() => setReceiptImage(null)}
-              style={{ marginTop: "10px" }}
-            >
-              Remove
-            </button>
+            <div style={{ marginTop: "12px", display: "flex", gap: "10px", justifyContent: "center" }}>
+              <button
+                onClick={handleProcessReceipt}
+                disabled={processing}
+                style={{ ...purpleButton, opacity: processing ? 0.6 : 1 }}
+              >
+                {processing ? "Processing..." : "Process receipt"}
+              </button>
+              <button
+                onClick={handleReceiptRemove}
+                disabled={processing}
+                style={{ ...darkButton, opacity: processing ? 0.6 : 1 }}
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ) : (
           <p style={{ color: "#8B8B93" }}>
@@ -153,6 +195,12 @@ function Dashboard() {
             />
           </label>
         </div>
+
+        {message && (
+          <p style={{ marginTop: "16px", color: messageIsError ? "#FF5C5C" : "#82ca9d" }}>
+            {message}
+          </p>
+        )}
       </div>
 
       <div
@@ -249,6 +297,7 @@ function Dashboard() {
             }}
           />
           <br />
+        
           <button onClick={() => setChatMessage("")} style={{ marginTop: "8px" }}>
             Send
           </button>
