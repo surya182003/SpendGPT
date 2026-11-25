@@ -141,6 +141,7 @@ test("money formatting", () => {
 
 test("source labels say where AI text came from", () => {
   assert.match(sourceLabel("llm", null), /local AI model/);
+  assert.equal(sourceLabel("computed", null), "Calculated from your figures");
   assert.match(sourceLabel("fallback", "connection"), /offline/);
   assert.match(sourceLabel("fallback", "unverified_figures"), /could not be checked/);
 });

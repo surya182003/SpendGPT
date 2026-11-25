@@ -88,7 +88,19 @@ uvicorn app.main:app --reload --env-file .env
 * `list_models()` / `alist_models()`: `GET /v1/models`
 * `chat()` / `achat()`: `POST /v1/chat/completions` (sync and async)
 * `chat_json()` / `achat_json()`: structured output using a JSON schema (`response_format`)
-* `status()` / `astatus()`: availability summary for `GET /api/ai/status`
+* `status()` / `astatus()`: availability summary for `GET /api/ai/status`, including
+  `active_model` (the model chat requests will use)
+* `resolve_model()` / `aresolve_model()`: which model to use (see below)
+
+**Model choice.** If `LM_STUDIO_MODEL` is set, that model is used. Otherwise the client reads
+LM Studio's own list (`GET /api/v0/models`), which gives each model's type and state, and picks
+the **loaded chat model (`llm`/`vlm`) with the largest context window**. The OpenAI-style
+`/v1/models` list can't tell models apart: in testing, LM Studio listed a small built-in model
+(`phonon-40m-multilingual`, type `llm`, 2k context) before the real chat model, and with
+just-in-time loading it lists every downloaded model. Picking the first entry would send
+chat requests to the wrong model. If `/api/v0/models` isn't available (another
+OpenAI-compatible server), the first non-embedding model is used. Setting `LM_STUDIO_MODEL`
+explicitly is still recommended.
 
 It also does the following:
 
@@ -277,9 +289,31 @@ transaction if that is later, so a new user's income isn't counted for months wi
 ### 4.2 LM Studio explanations and the advisor
 
 * `explain_insights` / `aexplain_insights` write a short plain-language summary of the report.
-* `ask_advisor` / `aask_advisor` answer the student's question using the report's figures.
-  Earlier chat turns can be passed in; only the last 6 `user`/`assistant` turns are sent, and any
-  other roles are dropped. Questions must be 1–500 characters.
+* `ask_advisor` / `aask_advisor` answer the student's question. Questions must be 1–500
+  characters.
+* **Common questions are answered directly from the figures** (`direct_answer`, `source:
+  "computed"`), with no LLM call. Questions are matched by keyword, with category synonyms such as
+  "takeaway" → Eating Out and "supermarket" → Groceries:
+
+  | Question type | Example | Answer uses |
+  |---------------|---------|-------------|
+  | top category | "Where am I spending most of my money?" | period totals per category + this month's top |
+  | one category | "How much did I spend on groceries this month / last month?" | this month so far, last month's total, that category's budget |
+  | budgets | "Am I exceeding my monthly budget?" | active budgets only: over, at risk, on track |
+  | biggest increase | "Which spending category increased the most?" | last two complete months, per category |
+  | saving | "How can I reduce unnecessary expenses?" | the top 3 savings opportunities |
+
+  An earlier version let LM Studio answer these from the full figures. Tested on seed user 1 with
+  `qwen2.5-coder-7b-instruct`, it got 3 of 5 wrong: it reported 6 months of groceries as "this
+  month", called monthly income a budget, and invented a category increase. Asking the model only
+  to rephrase a computed answer didn't work either. It dropped figures or added unsupported claims
+  ("you already spent more than planned in October"). Computed answers are correct and instant.
+* **Other questions** ("Give me an overview", "Am I saving enough?") go to LM Studio with the full
+  figures. Earlier chat turns can be passed in; only the last 6 `user`/`assistant` turns are sent,
+  and any other roles are dropped.
+* The figures sent to the model include this month per category, the per-category change between
+  the last two complete months, and **only currently active budgets**. Ended budgets are reduced
+  to a count, and the prompt states that monthly income is not a budget.
 * Only aggregates go to the model (`llm_facts`): no names, emails, merchants or individual
   transactions.
 * **Figure check.** The model is told to use only the given figures. `unsupported_figures` also
@@ -287,8 +321,11 @@ transaction if that is later, so a new user's income isn't counted for months wi
   difference is allowed). A reply with an invented figure is replaced by the template text, with
   reason `unverified_figures`.
 * **Fallback.** If LM Studio is disabled, offline or returns an error, a template summary built
-  from the same figures is returned. The result is an `AIText` with `source` set to `llm` or
-  `fallback`, and a `reason`.
+  from the same figures is returned. The result is an `AIText` with `source` set to `llm`,
+  `computed` or `fallback`, and a `reason`.
+* **Known limitation.** The figure check confirms that every number in a free-form reply exists
+  in the data, not that it is used for the right thing. For example, a summary once gave a monthly
+  range using two real but wrong months. Recognised questions avoid this by not using the LLM.
 
 ### 4.3 Tests
 
@@ -299,7 +336,10 @@ transaction if that is later, so a new user's income isn't counted for months wi
 * savings opportunities and recommendations;
 * a cross-check against the seed transactions;
 * the LLM paths: the prompt contents, no personal data in the prompt, the offline fallback,
-  rejected invented figures, and the advisor's chat history.
+  rejected invented figures, and the advisor's chat history;
+* the advisor's computed answers to each example question, on a small hand-checked dataset
+  (this month vs whole period, last month, synonyms, active vs ended budgets, biggest increase,
+  savings, too little history, no budgets, unrecognised questions going to the LLM).
 
 ---
 

@@ -140,6 +140,26 @@ class Recommendation:
 
 
 @dataclass
+class CategoryMonth:
+    """One category's spend this month so far, next to last month's full total."""
+    category_id: int | None
+    category_name: str
+    this_month: float
+    last_month: float | None        # None when last month is before the user's history
+
+
+@dataclass
+class CategoryChange:
+    """One category in the latest complete month compared with the month before."""
+    category_id: int | None
+    category_name: str
+    previous: float
+    latest: float
+    change: float
+    change_pct: float | None        # None when nothing was spent in the earlier month
+
+
+@dataclass
 class InsightsReport:
     user_id: int
     currency: str
@@ -165,6 +185,11 @@ class InsightsReport:
     savings_opportunities: list[SavingsOpportunity]
     recommendations: list[Recommendation]
     notes: list[str] = field(default_factory=list)
+    current_month: str = ""                                   # e.g. "November 2026"
+    previous_month: str = ""                                  # e.g. "October 2026"
+    this_month_by_category: list[CategoryMonth] = field(default_factory=list)
+    change_period: dict | None = None                         # {"latest": "October 2026", "previous": "September 2026"}
+    category_changes: list[CategoryChange] = field(default_factory=list)  # biggest increase first
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -173,7 +198,7 @@ class InsightsReport:
 @dataclass
 class AIText:
     text: str
-    source: str                     # llm | fallback
+    source: str                     # llm | computed | fallback
     reason: str | None = None       # why the fallback was used (LMStudioError.reason, unverified_figures, ...)
 
     def to_dict(self) -> dict:
@@ -315,7 +340,48 @@ def compute_insights(
         savings_opportunities=opportunities, recommendations=[], notes=notes,
     )
     report.recommendations = _recommendations(report, fmt)
+    _add_month_breakdown(report, dated, categories, today, period_start)
     return report
+
+
+def _add_month_breakdown(report: InsightsReport, transactions: list, categories: dict, today: date,
+                         period_start: date | None) -> None:
+    """This month per category, and per-category change between the last two complete months."""
+    current = _month_key(today)
+    previous = shift_month(*current, -1)
+    before = shift_month(*current, -2)
+    report.current_month = month_label(*current)
+    report.previous_month = month_label(*previous)
+
+    totals: dict[tuple[int, int], dict] = defaultdict(lambda: defaultdict(float))
+    for t in transactions:
+        key = t.category_id if t.category_id in categories else None
+        totals[_month_key(t.transaction_date)][key] += float(t.amount)
+
+    def name(category_id):
+        return categories.get(category_id, (UNCATEGORISED, None))[0] if category_id is not None else UNCATEGORISED
+
+    # A month only counts as known when the user's history (period_start) covers all of it.
+    def known(month: tuple[int, int]) -> bool:
+        return period_start is not None and date(*month, 1) >= period_start
+
+    has_previous = known(previous)
+    ids = set(totals[current]) | (set(totals[previous]) if has_previous else set())
+    rows = [CategoryMonth(category_id=c, category_name=name(c), this_month=_r(totals[current].get(c, 0.0)),
+                          last_month=_r(totals[previous].get(c, 0.0)) if has_previous else None) for c in ids]
+    rows.sort(key=lambda r: (-r.this_month, -(r.last_month or 0), r.category_name))
+    report.this_month_by_category = rows
+
+    if not (known(previous) and known(before)):
+        return
+    report.change_period = {"latest": month_label(*previous), "previous": month_label(*before)}
+    changes = []
+    for c in set(totals[previous]) | set(totals[before]):
+        old, new = totals[before].get(c, 0.0), totals[previous].get(c, 0.0)
+        changes.append(CategoryChange(category_id=c, category_name=name(c), previous=_r(old), latest=_r(new),
+                                      change=_r(new - old), change_pct=_r((new - old) / old * 100) if old else None))
+    changes.sort(key=lambda x: (-x.change, x.category_name))
+    report.category_changes = changes
 
 
 def _monthly_pattern(window: list, period_start: date | None, today: date) -> MonthlyPattern:
@@ -566,6 +632,9 @@ _SYSTEM_PROMPT = (
     "- Use only the figures in the JSON. Do not calculate, estimate or invent any new numbers.\n"
     "- Quote amounts exactly as they appear, with the currency symbol.\n"
     "- Plain, encouraging language. No jargon, no investment or legal advice, no judgement.\n"
+    "- monthly_income is income, not a budget. Budgets are only the entries in current_budgets.\n"
+    "- Only say a budget is exceeded if its status is \"over\". \"at_risk\" means close to the limit.\n"
+    "- \"This month\" means current_month; totals in \"categories\" cover the whole period, not one month.\n"
     "- If the data does not answer something, say so instead of guessing."
 )
 _AMOUNT_RE = re.compile(r"(?:[€£$]|\bEUR\b|\bGBP\b|\bUSD\b)\s?(\d[\d,]*(?:\.\d+)?)"
@@ -596,9 +665,18 @@ def llm_facts(report: InsightsReport) -> dict:
         "trend": m.trend, "trend_change_pct": m.trend_change_pct,
         "average_complete_month": fmt(m.average_complete_month),
         "this_month_so_far": fmt(m.current_month_spent), "this_month_projected": fmt(m.current_month_projected),
-        "budgets": [{"category": b.category_name, "limit": fmt(b.amount_limit), "spent": fmt(b.spent),
-                     "used_pct": b.used_pct, "projected": fmt(b.projected), "status": b.status,
-                     "active": b.is_active, "ends": b.end_date.isoformat()} for b in report.budgets],
+        "current_month": report.current_month,
+        "this_month_by_category": [{"name": c.category_name, "this_month_so_far": fmt(c.this_month),
+                                    "last_month_total": fmt(c.last_month)} for c in report.this_month_by_category],
+        "category_change": ({"compares": f"{report.change_period['latest']} with {report.change_period['previous']}",
+                             "changes": [{"name": c.category_name, "before": fmt(c.previous), "after": fmt(c.latest),
+                                          "change": fmt(c.change), "change_pct": c.change_pct}
+                                         for c in report.category_changes]}
+                            if report.change_period else None),
+        "current_budgets": [{"category": b.category_name, "limit": fmt(b.amount_limit), "spent": fmt(b.spent),
+                             "used_pct": b.used_pct, "projected": fmt(b.projected), "status": b.status,
+                             "ends": b.end_date.isoformat()} for b in report.budgets if b.is_active],
+        "ended_budgets_that_went_over": sum(1 for b in report.budgets if not b.is_active and b.status == "over"),
         "savings_opportunities": [{"idea": o.title, "detail": o.explanation,
                                    "saving_per_month": fmt(o.potential_monthly_saving)}
                                   for o in report.savings_opportunities],
@@ -705,6 +783,162 @@ def _clean_question(question: str | None) -> str:
     return question
 
 
+# -- direct answers to common questions -------------------------------------------------
+# Common questions are answered from the report in Python, so the numbers are always the
+# right ones for the question (see ask_advisor).
+_CATEGORY_WORDS = {
+    "groceries": ["groceries", "grocery", "supermarket", "food shopping", "food shop"],
+    "eating out": ["eating out", "eat out", "restaurant", "restaurants", "takeaway", "takeaways", "take away",
+                   "coffee", "cafe", "cafes", "dining"],
+    "transport": ["transport", "travel", "bus", "buses", "taxi", "taxis", "uber", "train", "leap card"],
+    "rent": ["rent", "accommodation", "landlord"],
+    "utilities": ["utilities", "utility", "bills", "electricity", "broadband", "internet", "phone bill"],
+    "subscriptions": ["subscriptions", "subscription", "netflix", "spotify", "streaming"],
+    "entertainment": ["entertainment", "cinema", "concerts", "concert", "nights out", "night out", "pub"],
+    "shopping": ["shopping", "clothes", "clothing", "amazon"],
+    "health": ["health", "pharmacy", "medicine", "doctor"],
+}
+_INCREASE_RE = re.compile(r"\b(increas\w*|went up|go(?:ne)? up|ris(?:e|en|ing)|rose|grew|grown|growing|jump\w*)\b")
+_BUDGET_RE = re.compile(r"\b(budgets?|overspend\w*|over ?spent|exceed\w*|over (?:the |my )?limit)\b")
+# "How can I save / reduce / cut back" - not "Am I saving enough?", which is about the savings goal.
+_SAVE_RE = re.compile(r"\b(reduce|cut (?:back|down|costs?)|cutting (?:back|down)|unnecessary|spend less|cheaper|"
+                      r"lower my|save (?:money|more)|ways to save|(?:how|where) (?:can|could|should|do) i save)\b")
+_AMOUNT_Q_RE = re.compile(r"\b(how much|spent|spend|spending|cost|paid|pay)\b")
+_TOP_RE = re.compile(r"\b(most|biggest|largest|highest|main|where (?:does|do|is|did) (?:my|all my) money)\b")
+
+
+def _question_category(report: InsightsReport, text: str) -> str | None:
+    """Category name (as in the report) mentioned in the question, longest phrase first."""
+    known = {c.category_name.lower(): c.category_name for c in report.categories}
+    known.update({c.category_name.lower(): c.category_name for c in report.this_month_by_category})
+    phrases = [(word, key) for key, words in _CATEGORY_WORDS.items() for word in words]
+    phrases += [(name, name) for name in known]
+    for phrase, key in sorted(phrases, key=lambda p: -len(p[0])):
+        if re.search(rf"\b{re.escape(phrase)}\b", text) and key in known:
+            return known[key]
+    return None
+
+
+def direct_answer(report: InsightsReport, question: str) -> str | None:
+    """Answer computed in Python for common questions, or None if the question isn't recognised."""
+    text = question.lower()
+    fmt = lambda v: money(v, report.currency)  # noqa: E731
+    category = _question_category(report, text)
+
+    intent = None
+    if _INCREASE_RE.search(text):
+        intent = "increase"
+    elif _BUDGET_RE.search(text):
+        intent = "budget"
+    elif _SAVE_RE.search(text):
+        intent = "save"
+    elif category and _AMOUNT_Q_RE.search(text):
+        intent = "category"
+    elif _TOP_RE.search(text):
+        intent = "top"
+    if intent is None:
+        return None
+    if report.history_status == "empty":
+        return ("You don't have any transactions yet, so I can't answer that. "
+                "Add your spending or scan a receipt and ask again.")
+
+    if intent == "increase":
+        if not report.change_period:
+            return ("I need at least two complete months of transactions to compare categories. "
+                    f"Ask again after {report.current_month} ends.")
+        period = f"{report.change_period['latest']} compared with {report.change_period['previous']}"
+        rises = [c for c in report.category_changes if c.change > 0]
+        if category:
+            row = next((c for c in report.category_changes if c.category_name == category), None)
+            if row is None:
+                return f"You had no {category} spending in either month ({period})."
+            direction = "up" if row.change > 0 else "down" if row.change < 0 else "unchanged"
+            pct = f", {abs(row.change_pct):.0f}%" if row.change_pct is not None and row.change else ""
+            return (f"{category} went {direction} in {period}: {fmt(row.previous)} → {fmt(row.latest)} "
+                    f"({'+' if row.change >= 0 else '-'}{fmt(abs(row.change))}{pct}).")
+        if not rises:
+            return f"No category went up in {period}. Your spending held steady or fell in every category."
+        top = rises[0]
+        pct = f", +{top.change_pct:.0f}%" if top.change_pct is not None else ", new this month"
+        answer = (f"{top.category_name} increased the most ({period}): {fmt(top.previous)} → {fmt(top.latest)} "
+                  f"(+{fmt(top.change)}{pct}).")
+        others = [f"{c.category_name} (+{fmt(c.change)})" for c in rises[1:3]]
+        if others:
+            answer += " Next: " + ", ".join(others) + "."
+        return answer
+
+    if intent == "budget":
+        active = [b for b in report.budgets if b.is_active and (not category or b.category_name == category)]
+        if not active:
+            scope = f"a {category} budget" if category else "a budget"
+            spent = report.monthly.current_month_spent
+            projected = report.monthly.current_month_projected
+            answer = f"You don't have {scope} running at the moment, so there is nothing to exceed."
+            if not category:
+                answer += f" You've spent {fmt(spent)} so far in {report.current_month}"
+                answer += f", on course for {fmt(projected)}." if projected else "."
+            return answer
+        over = [b for b in active if b.status == "over"]
+        risk = [b for b in active if b.status == "at_risk"]
+
+        def line(b):
+            pace = f", on course for {fmt(b.projected)} by {b.end_date.day} {b.end_date:%B}" if b.projected else ""
+            return f"{b.category_name}: {fmt(b.spent)} of {fmt(b.amount_limit)} ({b.used_pct:.0f}%{pace})"
+
+        if over:
+            answer = "Yes. Over budget: " + "; ".join(line(b) for b in over) + "."
+        else:
+            answer = "No, you haven't exceeded any of your current budgets."
+        if risk:
+            answer += " Close to the limit: " + "; ".join(line(b) for b in risk) + "."
+        fine = [b for b in active if b.status == "on_track"]
+        if fine:
+            answer += " On track: " + ", ".join(f"{b.category_name} ({b.used_pct:.0f}% used)" for b in fine) + "."
+        return answer
+
+    if intent == "save":
+        ideas = report.savings_opportunities[:3]
+        if not ideas:
+            return ("I couldn't find an obvious place to cut back: you have no large non-essential categories, "
+                    "frequent small purchases or budget overspends right now.")
+        total = sum(o.potential_monthly_saving for o in ideas)
+        answer = "Here are the biggest savings I can see in your spending: " + " ".join(
+            f"{i}. {o.title}: {o.explanation}" for i, o in enumerate(ideas, 1))
+        return answer + f" Together that's about {fmt(total)} a month."
+
+    if intent == "category":
+        last = "last month" in text or "previous month" in text
+        row = next((c for c in report.this_month_by_category if c.category_name == category), None)
+        if last:
+            if row is None or row.last_month is None:
+                return f"I don't have {category} figures for {report.previous_month}."
+            return f"You spent {fmt(row.last_month)} on {category} in {report.previous_month}."
+        this_month = row.this_month if row else 0.0
+        answer = f"You've spent {fmt(this_month)} on {category} so far in {report.current_month}"
+        answer += f" (up to {report.period_end.day} {report.period_end:%B})."
+        if row and row.last_month is not None:
+            answer += f" In {report.previous_month} you spent {fmt(row.last_month)} in total."
+        budget = next((b for b in report.budgets if b.is_active and b.category_name == category), None)
+        if budget:
+            answer += f" That's {budget.used_pct:.0f}% of your {fmt(budget.amount_limit)} {category} budget."
+        return answer
+
+    # intent == "top"
+    if not report.categories:
+        return "There is no categorised spending yet."
+    first = report.categories[0]
+    since = month_label(report.period_start.year, report.period_start.month) if report.period_start else ""
+    answer = (f"Your biggest spending category is {first.category_name}: {fmt(first.total)}, "
+              f"{first.share_pct:.0f}% of the {fmt(report.total_spent)} you've spent since {since}.")
+    others = [f"{c.category_name} ({fmt(c.total)})" for c in report.categories[1:3]]
+    if others:
+        answer += " Next are " + " and ".join(others) + "."
+    now = next((c for c in report.this_month_by_category if c.this_month > 0), None)
+    if now:
+        answer += f" So far in {report.current_month}, the most has gone on {now.category_name} ({fmt(now.this_month)})."
+    return answer
+
+
 def _advisor_fallback(report: InsightsReport, reason: str) -> str:
     intro = ("The AI advisor isn't available right now, so here is a summary of your figures instead."
              if reason != "unverified_figures" else
@@ -762,15 +996,23 @@ def ask_advisor(report: InsightsReport, question: str, client: LMStudioClient | 
                 history: list[dict] | None = None) -> AIText:
     """Answer a question about the user's own finances. Raises ValueError for an empty/over-long question.
 
+    Recognised questions (top category, a category's spend, budgets, biggest increase, how to
+    save) are answered directly from the figures (source "computed"), with no LLM call: testing
+    showed the local model dropped or changed figures when asked to rephrase them. Other
+    questions go to the LLM with the full figures, and its reply is number-checked.
     `history` is the earlier chat as [{"role": "user"|"assistant", "content": str}]; only the
     last few turns are sent.
     """
     question = _clean_question(question)
+    answer = direct_answer(report, question)
+    if answer is not None:
+        return AIText(answer, "computed")
+
     fallback = lambda reason: _advisor_fallback(report, reason)  # noqa: E731
     if client is None:
         return AIText(fallback("disabled"), "fallback", "disabled")
     try:
-        text = client.chat(_advisor_messages(report, question, history), temperature=0.3, max_tokens=350)
+        text = client.chat(_advisor_messages(report, question, history), temperature=0.3, max_tokens=600)
     except LMStudioError as exc:
         logger.info("Advisor unavailable: %s", exc.reason)
         return AIText(fallback(exc.reason), "fallback", exc.reason)
@@ -780,11 +1022,15 @@ def ask_advisor(report: InsightsReport, question: str, client: LMStudioClient | 
 async def aask_advisor(report: InsightsReport, question: str, client: LMStudioClient | None,
                        history: list[dict] | None = None) -> AIText:
     question = _clean_question(question)
+    answer = direct_answer(report, question)
+    if answer is not None:
+        return AIText(answer, "computed")
+
     fallback = lambda reason: _advisor_fallback(report, reason)  # noqa: E731
     if client is None:
         return AIText(fallback("disabled"), "fallback", "disabled")
     try:
-        text = await client.achat(_advisor_messages(report, question, history), temperature=0.3, max_tokens=350)
+        text = await client.achat(_advisor_messages(report, question, history), temperature=0.3, max_tokens=600)
     except LMStudioError as exc:
         logger.info("Advisor unavailable: %s", exc.reason)
         return AIText(fallback(exc.reason), "fallback", exc.reason)

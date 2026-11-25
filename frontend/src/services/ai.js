@@ -19,7 +19,8 @@ export async function getInsights(userId, months = 6, explain = true) {
 }
 
 // Ask the AI advisor. history = [{ role: "user" | "assistant", content }]
-// -> { answer, source: "llm" | "fallback", reason }
+// -> { answer, source: "llm" | "computed" | "fallback", reason }
+// "computed": common questions are answered directly from the user's figures by the backend.
 export async function askAdvisor(userId, question, history = [], months = 6) {
   return request("/api/ai/users/" + userId + "/chat", {
     method: "POST",
@@ -115,6 +116,9 @@ export const CATEGORY_SOURCE = {
 export function sourceLabel(source, reason) {
   if (source === "llm") {
     return "Written by the local AI model from your figures";
+  }
+  if (source === "computed") {
+    return "Calculated from your figures";
   }
   if (reason === "no_data") {
     return "Summary";

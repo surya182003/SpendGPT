@@ -196,3 +196,65 @@ def test_real_unreachable_port():
     assert client.is_available() is False
     with pytest.raises(LMStudioConnectionError):
         client.chat([{"role": "user", "content": "hi"}])
+
+
+# -- choosing a model when LM_STUDIO_MODEL is empty ----------------------------------
+# Shape of LM Studio's own /api/v0/models list (captured from LM Studio 0.3.x).
+NATIVE_MODELS = {"data": [
+    {"id": "phonon-40m-multilingual", "type": "llm", "state": "loaded", "loaded_context_length": 2048},
+    {"id": "qwen2.5-7b-instruct", "type": "llm", "state": "loaded", "loaded_context_length": 32768},
+    {"id": "llama-3.2-3b-instruct", "type": "llm", "state": "not-loaded", "max_context_length": 131072},
+    {"id": "text-embedding-nomic", "type": "embeddings", "state": "loaded", "max_context_length": 2048},
+]}
+
+
+class NativeServer(FakeServer):
+    def __init__(self, native=NATIVE_MODELS, native_status=200, **kwargs):
+        super().__init__(models={"data": [{"id": m["id"]} for m in native["data"]]}, **kwargs)
+        self.native, self.native_status = native, native_status
+
+    def __call__(self, request):
+        if request.url.path == "/api/v0/models":
+            self.requests.append(request)
+            return httpx.Response(self.native_status, json=self.native)
+        return super().__call__(request)
+
+
+def test_picks_loaded_chat_model_with_largest_context_not_first_listed():
+    server = NativeServer()
+    make_client(server).chat([])
+    assert server.last_payload["model"] == "qwen2.5-7b-instruct"  # not phonon, not the unloaded llama
+
+
+@pytest.mark.anyio
+async def test_async_picks_the_same_model():
+    server = NativeServer()
+    await make_client(server).achat([])
+    assert server.last_payload["model"] == "qwen2.5-7b-instruct"
+
+
+def test_configured_model_skips_auto_selection():
+    server = NativeServer()
+    make_client(server, model="llama-3.2-3b-instruct").chat([])
+    assert server.last_payload["model"] == "llama-3.2-3b-instruct"
+    assert not any(r.url.path == "/api/v0/models" for r in server.requests)
+
+
+def test_falls_back_to_openai_list_when_native_list_is_missing():
+    server = NativeServer(native_status=404)
+    make_client(server).chat([])
+    assert server.last_payload["model"] == "phonon-40m-multilingual"  # first non-embedding id
+
+
+def test_status_reports_the_model_that_will_be_used():
+    status = make_client(NativeServer()).status()
+    assert status["available"] is True
+    assert status["active_model"] == "qwen2.5-7b-instruct"
+    configured = make_client(NativeServer(), model="llama-3.2-3b-instruct").status()
+    assert configured["active_model"] == "llama-3.2-3b-instruct"
+
+
+def test_native_url_only_for_v1_base_urls():
+    assert LMStudioClient(base_url="http://localhost:1234/v1")._native_models_url() == \
+        "http://localhost:1234/api/v0/models"
+    assert LMStudioClient(base_url="http://example/api")._native_models_url() is None

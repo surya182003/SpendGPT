@@ -13,6 +13,7 @@ class LMStudioStatusResponse(BaseModel):
     reason: str | None
     models: list[str]
     configured_model: str | None
+    active_model: str | None = None  # the model chat requests will use
 
 
 # -- categorisation -------------------------------------------------------------------
@@ -114,6 +115,22 @@ class BudgetStatusResponse(BaseModel):
     status: Literal["over", "at_risk", "on_track"]
 
 
+class CategoryMonthResponse(BaseModel):
+    category_id: int | None
+    category_name: str
+    this_month: float
+    last_month: float | None
+
+
+class CategoryChangeResponse(BaseModel):
+    category_id: int | None
+    category_name: str
+    previous: float
+    latest: float
+    change: float
+    change_pct: float | None
+
+
 class SavingsOpportunityResponse(BaseModel):
     type: str
     title: str
@@ -161,6 +178,11 @@ class InsightsResponse(BaseModel):
     savings_opportunities: list[SavingsOpportunityResponse]
     recommendations: list[RecommendationResponse]
     notes: list[str]
+    current_month: str = ""
+    previous_month: str = ""
+    this_month_by_category: list[CategoryMonthResponse] = []
+    change_period: dict[str, str] | None = None
+    category_changes: list[CategoryChangeResponse] = []
     explanation: AITextResponse | None = None
 
 
@@ -178,5 +200,5 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
-    source: Literal["llm", "fallback"]
+    source: Literal["llm", "computed", "fallback"]  # computed = answered directly from the figures
     reason: str | None = None

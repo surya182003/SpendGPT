@@ -61,7 +61,8 @@ def test_ai_routes_do_not_conflict_with_existing_routes():
 # -- status ----------------------------------------------------------------------------
 def test_status_when_lm_studio_is_running(client, llm):
     body = client.get(f"{AI}/status").json()
-    assert body == {"available": True, "reason": None, "models": ["fake-model"], "configured_model": None}
+    assert body == {"available": True, "reason": None, "models": ["fake-model"], "configured_model": None,
+                    "active_model": "fake-model"}
 
 
 def test_status_when_lm_studio_is_offline(client, llm):
@@ -279,6 +280,22 @@ def test_insights_endpoint_returns_figures_and_explanation(client, spender, llm)
                                    "source": "llm", "reason": None}
 
 
+def test_insights_include_this_month_and_category_changes(client, spender, llm):
+    body = client.get(f"{AI}/users/{spender}/insights", params={"explain": False}).json()
+    assert body["current_month"] and body["previous_month"]
+    rows = body["this_month_by_category"]
+    assert {r["category_name"] for r in rows} <= {"Rent", "Groceries"}
+    assert sum(r["this_month"] for r in rows) == body["monthly"]["current_month_spent"]
+    assert isinstance(body["category_changes"], list)
+
+
+def test_chat_budget_question_gets_the_computed_answer_offline(client, spender, llm):
+    llm.available = False
+    body = client.post(f"{AI}/users/{spender}/chat", json={"question": "Am I exceeding my budget?"}).json()
+    assert body["source"] == "computed" and body["reason"] is None
+    assert body["answer"].startswith("Yes. Over budget: Groceries: €120.00 of €100.00 (120%")
+
+
 def test_insights_without_explanation_skips_the_llm(client, spender, llm):
     body = client.get(f"{AI}/users/{spender}/insights", params={"explain": False}).json()
     assert body["explanation"] is None and llm.calls == []
@@ -319,14 +336,14 @@ def test_insights_validation(client, db, user, llm, path, code):
 def test_chat_answers_from_the_users_figures(client, spender, llm):
     llm.reply = "Your groceries came to €240.00 over the period."
     response = client.post(f"{AI}/users/{spender}/chat", json={
-        "question": "How much do I spend on groceries?",
+        "question": "Give me an overview of my money.",
         "history": [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "Hello!"}],
     })
     assert response.status_code == 200
     assert response.json() == {"answer": "Your groceries came to €240.00 over the period.", "source": "llm",
                                "reason": None}
     sent = llm.calls[0]
-    assert "€1,240.00" in sent[0]["content"] and sent[-1]["content"] == "How much do I spend on groceries?"
+    assert "€1,240.00" in sent[0]["content"] and sent[-1]["content"] == "Give me an overview of my money."
 
 
 def test_chat_falls_back_when_lm_studio_is_offline(client, spender, llm):
