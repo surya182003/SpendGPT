@@ -1,54 +1,97 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CATEGORIES, getBudget, saveBudget, getBudgetTotal } from "../services/budget";
+import { getCategories, getMonthBudgets, saveMonthBudget } from "../services/budget";
 
 function Budget() {
   const navigate = useNavigate();
   const userId = sessionStorage.getItem("userId");
 
-  // start with the amounts already saved (empty boxes if there is no budget yet)
-  const [amounts, setAmounts] = useState(() => {
-    const saved = getBudget(userId) || {};
-    const start = {};
-    for (const name of CATEGORIES) {
-      start[name] = saved[name] ?? "";
-    }
-    return start;
-  });
+  const [categories, setCategories] = useState([]);
+  // the budgets already saved in the database for this month, by category_id
+  const [saved, setSaved] = useState({});
+  // what is typed in each box, by category_id
+  const [amounts, setAmounts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   // if nobody is logged in, go back to the login page
+  // otherwise load the categories and the budgets saved for this month
   useEffect(() => {
     if (!userId) {
       navigate("/");
+      return;
     }
+
+    async function loadBudget() {
+      try {
+        const categoryList = await getCategories();
+        const budgets = await getMonthBudgets(userId);
+
+        const savedByCategory = {};
+        const start = {};
+        for (const budget of budgets) {
+          if (budget.category_id !== null) {
+            savedByCategory[budget.category_id] = budget;
+          }
+        }
+        for (const category of categoryList) {
+          const budget = savedByCategory[category.category_id];
+          start[category.category_id] = budget ? String(Number(budget.amount_limit)) : "";
+        }
+
+        setCategories(categoryList);
+        setSaved(savedByCategory);
+        setAmounts(start);
+      } catch (err) {
+        setError(err.message);
+      }
+      setLoading(false);
+    }
+
+    loadBudget();
   }, [userId, navigate]);
 
-  function handleChange(name, value) {
-    setAmounts({ ...amounts, [name]: value });
+  function handleChange(categoryId, value) {
+    setAmounts({ ...amounts, [categoryId]: value });
     setError("");
   }
 
-  function handleSave() {
-    const budget = {};
-    for (const name of CATEGORIES) {
-      const amount = Number(amounts[name] || 0);
+  async function handleSave() {
+    // check everything first so nothing is half saved because of a typo
+    for (const category of categories) {
+      const amount = Number(amounts[category.category_id] || 0);
       if (isNaN(amount) || amount < 0) {
-        setError("Please enter a number of 0 or more for " + name);
+        setError("Please enter a number of 0 or more for " + category.category_name);
         return;
       }
-      budget[name] = amount;
     }
-    saveBudget(userId, budget);
-    navigate("/profile");
+
+    setSaving(true);
+    setError("");
+    try {
+      for (const category of categories) {
+        const existing = saved[category.category_id] || null;
+        const amount = Number(amounts[category.category_id] || 0);
+        const before = existing ? Number(existing.amount_limit) : 0;
+
+        // only send the ones that changed
+        if (amount !== before) {
+          await saveMonthBudget(userId, category.category_id, amount, existing);
+        }
+      }
+      navigate("/profile");
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
   }
 
   // the total of everything typed so far
-  const typed = {};
-  for (const name of CATEGORIES) {
-    typed[name] = Number(amounts[name]) || 0;
+  let total = 0;
+  for (const category of categories) {
+    total = total + (Number(amounts[category.category_id]) || 0);
   }
-  const total = getBudgetTotal(typed);
 
   if (!userId) {
     return null;
@@ -96,9 +139,15 @@ function Budget() {
           How much do you want to spend each month on:
         </p>
 
-        {CATEGORIES.map((name) => (
+        {loading && <p style={{ color: "#8B8B93" }}>Loading…</p>}
+
+        {!loading && categories.length === 0 && !error && (
+          <p style={{ color: "#8B8B93" }}>There are no categories yet. Run the seed script in the backend first.</p>
+        )}
+
+        {categories.map((category) => (
           <div
-            key={name}
+            key={category.category_id}
             style={{
               display: "flex",
               alignItems: "center",
@@ -110,18 +159,18 @@ function Budget() {
               boxShadow: "5px 5px 12px #060608, -3px -3px 10px #1b1b20",
             }}
           >
-            <label htmlFor={"budget-" + name} style={{ fontSize: "15px" }}>
-              {name}
+            <label htmlFor={"budget-" + category.category_id} style={{ fontSize: "15px" }}>
+              {category.category_name}
             </label>
             <div>
               <span style={{ color: "#8B8B93", marginRight: "6px" }}>€</span>
               <input
-                id={"budget-" + name}
+                id={"budget-" + category.category_id}
                 type="number"
                 min="0"
                 placeholder="0"
-                value={amounts[name]}
-                onChange={(e) => handleChange(name, e.target.value)}
+                value={amounts[category.category_id] ?? ""}
+                onChange={(e) => handleChange(category.category_id, e.target.value)}
                 style={{
                   width: "90px",
                   padding: "8px",
@@ -146,7 +195,9 @@ function Budget() {
 
         <button
           onClick={handleSave}
+          disabled={loading || saving || categories.length === 0}
           style={{
+            opacity: loading || saving ? 0.6 : 1,
             width: "100%",
             marginTop: "16px",
             padding: "14px",
@@ -159,7 +210,7 @@ function Budget() {
             cursor: "pointer",
           }}
         >
-          Save budget
+          {saving ? "Saving..." : "Save budget"}
         </button>
       </div>
     </div>
