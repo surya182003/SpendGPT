@@ -201,10 +201,15 @@ def test_scan_stores_alerts_once(client, db, user):
     add_txn(db, user["user_id"], 260, 1)
 
     first = client.post(f"{AI}/users/{user['user_id']}/anomalies/scan").json()
-    assert first["alerts_created"] == 1 and first["flags"][0]["type"] == "amount_outlier"
-    assert "fraud" not in first["flags"][0]["explanation"].lower()
+    # Depending on today's date the €260 also pushes this month over the monthly-spike
+    # threshold, so there can be a spending_spike flag as well; every flag is stored once.
+    outliers = [f for f in first["flags"] if f["type"] == "amount_outlier"]
+    assert len(outliers) == 1 and outliers[0]["amount"] == 260
+    assert {f["type"] for f in first["flags"]} <= {"amount_outlier", "category_spike"}
+    assert first["alerts_created"] == len(first["flags"])
+    assert all("fraud" not in f["explanation"].lower() for f in first["flags"])
     second = client.post(f"{AI}/users/{user['user_id']}/anomalies/scan").json()
-    assert second["alerts_created"] == 0 and len(second["flags"]) == 1
+    assert second["alerts_created"] == 0 and len(second["flags"]) == len(first["flags"])
 
 
 def test_scan_with_no_history(client, db, user):
