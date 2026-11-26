@@ -68,3 +68,18 @@ export async function uploadReceipt(userId, file) {
 export async function getUserReceipts(userId) {
   return request("/api/ai/users/" + userId + "/receipts");
 }
+
+// All the categories (Rent, Groceries, ...) for the dropdown
+export async function getCategories() {
+  return request("/api/categories/");
+}
+
+// Saves one expense that was typed in by hand
+// expense = { merchant_name, amount, transaction_date, category_id, is_recurring }
+export async function addManualExpense(userId, expense) {
+  return request("/api/transactions/?user_id=" + userId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(expense),
+  });
+}

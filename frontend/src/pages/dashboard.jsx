@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { uploadReceipt } from "../services/api";
+import { addManualExpense, getCategories, uploadReceipt } from "../services/api";
 import { categoryChartData, formatMoney, getInsights, monthlyChartData } from "../services/ai.js";
 import AdvisorChat from "../components/ai/AdvisorChat";
 import AIStatusBadge from "../components/ai/AIStatusBadge";
@@ -31,6 +31,29 @@ const buttonStyle = {
 const purpleButton = { ...buttonStyle, background: "#8884d8", color: "white", border: "1px solid #8884d8" };
 const darkButton = { ...buttonStyle, background: "#151518", color: "#F2F1ED", border: "1px solid #232328" };
 
+
+// boxes and labels of the manual expense form
+const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  marginTop: "6px",
+  padding: "10px",
+  borderRadius: "6px",
+  border: "1px solid #232328",
+  background: "#0A0A0C",
+  color: "#F2F1ED",
+  fontSize: "14px",
+  colorScheme: "dark",
+};
+const labelStyle = { display: "block", marginTop: "14px", fontSize: "13px", color: "#8B8B93" };
+
+// today's date as YYYY-MM-DD, the format the date box uses
+function todayString() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return now.getFullYear() + "-" + month + "-" + day;
+}
 function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,6 +92,26 @@ function Dashboard() {
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [messageIsError, setMessageIsError] = useState(false);
+
+  
+  // the manual expense form (the dropdown above Scan a Receipt)
+  const [showManual, setShowManual] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [expenseName, setExpenseName] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("");
+  const [expenseDate, setExpenseDate] = useState(todayString());
+  const [expenseRecurring, setExpenseRecurring] = useState(false);
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [expenseMessage, setExpenseMessage] = useState("");
+  const [expenseIsError, setExpenseIsError] = useState(false);
+
+  // get the category names for the dropdown
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
 
   function handleReceiptSelect(e) {
     const file = e.target.files[0];
@@ -120,6 +163,59 @@ function Dashboard() {
     setProcessing(false);
   }
 
+    // shows a short message under the manual expense form for a few seconds
+  function showExpenseMessage(text, isError) {
+    setExpenseMessage(text);
+    setExpenseIsError(isError);
+    setTimeout(() => setExpenseMessage(""), 8000);
+  }
+
+  async function handleSaveExpense(e) {
+    e.preventDefault();
+    if (!userId) {
+      navigate("/");
+      return;
+    }
+
+    // keep two decimals, like 12.5 or 12.50
+    const amount = Math.round(Number(expenseAmount) * 100) / 100;
+    if (expenseName.trim() === "" || !(amount > 0) || expenseDate === "") {
+      showExpenseMessage("Please fill in what it was for, the amount and the date", true);
+      return;
+    }
+
+    setSavingExpense(true);
+    setExpenseMessage("");
+    try {
+      const saved = await addManualExpense(userId, {
+        merchant_name: expenseName.trim(),
+        amount: amount,
+        transaction_date: expenseDate,
+        category_id: expenseCategory === "" ? null : Number(expenseCategory),
+        is_recurring: expenseRecurring,
+      });
+
+      // the backend picks a category when none was chosen
+      let text = "Expense saved: " + saved.merchant_name + " · €" + Number(saved.amount).toFixed(2);
+      const category = categories.find((c) => c.category_id === saved.category_id);
+      if (category) {
+        text = text + " · Category: " + category.category_name;
+      }
+      showExpenseMessage(text, false);
+
+      // empty the form for the next expense
+      setExpenseName("");
+      setExpenseAmount("");
+      setExpenseCategory("");
+      setExpenseDate(todayString());
+      setExpenseRecurring(false);
+      loadInsights(); // the new expense changes the totals
+    } catch (err) {
+      showExpenseMessage(err.message, true);
+    }
+    setSavingExpense(false);
+  }
+
   return (
     <div
       style={{
@@ -154,6 +250,102 @@ function Dashboard() {
       <h2>Dashboard</h2>
       <p style={{ color: "#8B8B93" }}>Welcome! You are logged in.</p>
       {userId && <AIStatusBadge />}
+
+
+      <div
+        style={{
+          border: "2px dashed #232328",
+          borderRadius: "10px",
+          padding: "20px",
+          marginTop: "30px",
+          background: "#151518",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0 }}>✍️ Add an expense manually</h3>
+          <button onClick={() => setShowManual(!showManual)} style={darkButton}>
+            {showManual ? "Close ▴" : "Open ▾"}
+          </button>
+        </div>
+
+        {showManual && (
+          <form onSubmit={handleSaveExpense} style={{ maxWidth: "420px", margin: "0 auto" }}>
+            <label style={labelStyle}>
+               Merchant / what was it for? 
+              <input
+                type="text"
+                maxLength={100}
+                value={expenseName}
+                onChange={(e) => setExpenseName(e.target.value)}
+                placeholder=" e.g. Rent, Groceries, Clothing"
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Amount (€)
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={expenseAmount}
+                onChange={(e) => setExpenseAmount(e.target.value)}
+                placeholder="0.00"
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Category
+              <select
+                value={expenseCategory}
+                onChange={(e) => setExpenseCategory(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">Choose for me automatically</option>
+                {categories.map((c) => (
+                  <option key={c.category_id} value={c.category_id}>
+                    {c.category_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={labelStyle}>
+              Date
+              <input
+                type="date"
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: "8px" }}>
+              <input
+                type="checkbox"
+                checked={expenseRecurring}
+                onChange={(e) => setExpenseRecurring(e.target.checked)}
+              />
+              This repeats every month
+            </label>
+
+            <button
+              type="submit"
+              disabled={savingExpense}
+              style={{ ...purpleButton, width: "100%", marginTop: "18px", opacity: savingExpense ? 0.6 : 1 }}
+            >
+              {savingExpense ? "Saving..." : "Save expense"}
+            </button>
+          </form>
+        )}
+
+        {expenseMessage && (
+          <p style={{ marginTop: "16px", textAlign: "center", color: expenseIsError ? "#FF5C5C" : "#82ca9d" }}>
+            {expenseMessage}
+          </p>
+        )}
+      </div>
 
       <div
         style={{
