@@ -58,7 +58,7 @@ def test_parse_money(raw, expected):
     assert parse_money(raw) == expected
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: amounts with a thousands separator return None")
+# used to return None, fixed in the totals/discounts OCR fix on main
 @pytest.mark.parametrize("raw", ["1,234.56", "1.234,56"])
 def test_parse_money_thousands_separator(raw):
     assert parse_money(raw) == Decimal("1234.56")
@@ -141,10 +141,7 @@ def test_zero_total_ignored():
     assert extract_total(["Total 0.00"]) == (None, None)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG?: the '-' is eaten as a 'Total - 3.00' separator, so a refund total -3.00 is read as +3.00",
-)
+# a refund total of -3.00 used to be read as +3.00, fixed in the OCR fix on main
 def test_negative_total_is_not_read_as_positive():
     assert extract_total(["Total -3.00"]) == (None, None)
 

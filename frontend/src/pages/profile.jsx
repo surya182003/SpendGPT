@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserReceipts } from "../services/api";
-import { getBudget, getBudgetTotal } from "../services/budget";
+import { getBudgetTotal, getMonthBudgets } from "../services/budget";
 
 function Profile() {
   const navigate = useNavigate();
   const email = sessionStorage.getItem("email");
   const userId = sessionStorage.getItem("userId");
   const [weekTotal, setWeekTotal] = useState(null);
-
-  // the budget this user made on the budget page (null if they have not made one)
-  const budget = getBudget(userId);
+  // this month's budgets from the database (null while loading or if it failed)
+  const [budgets, setBudgets] = useState(null);
+  const hasBudget = budgets !== null && budgets.length > 0;
 
   // if nobody is logged in, go back to the login page
   // otherwise add up what was spent in the last 7 days
@@ -34,6 +34,10 @@ function Profile() {
         setWeekTotal(total);
       })
       .catch(() => setWeekTotal(null));
+
+    getMonthBudgets(userId)
+      .then((list) => setBudgets(list))
+      .catch(() => setBudgets(null));
   }, [email, userId, navigate]);
 
   function handleLogout() {
@@ -48,8 +52,8 @@ function Profile() {
   const menuItems = [
     {
       icon: "💰",
-      title: budget ? "Edit budget" : "Create budget",
-      subtitle: "Food, transport, entertainment and other",
+      title: hasBudget ? "Edit budget" : "Create budget",
+      subtitle: "Set a monthly limit per category",
       onClick: () => navigate("/budget"),
     },
     {
@@ -174,7 +178,7 @@ function Profile() {
           </div>
           <div style={tileStyle}>
             <span style={tileLabelStyle}>MONTHLY BUDGET</span>
-            <p style={tileValueStyle}>{budget ? "€" + getBudgetTotal(budget).toFixed(2) : "Not set"}</p>
+            <p style={tileValueStyle}>{budgets === null ? "—" : hasBudget ? "€" + getBudgetTotal(budgets).toFixed(2) : "Not set"}</p>
           </div>
         </div>
 
