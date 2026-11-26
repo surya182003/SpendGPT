@@ -5,7 +5,8 @@ import re
 CURRENCY = "EUR"
 
 CUR = r"(?:EUR|€)"
-AMT = r"\d{1,6}[.,]\d{2}"
+# optional thousands separators: 1,234.56 / 1.234,56
+AMT = r"(?:\d{1,3}(?:[.,]\d{3})+|\d{1,6})[.,]\d{2}"
 SIGNED_AMT = rf"-?{AMT}"
 
 # A line that is ONLY a price, e.g. "0.99", "0.99 A", "EUR13.61", "-0.30".
