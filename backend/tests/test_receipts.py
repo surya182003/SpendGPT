@@ -364,7 +364,9 @@ HUGE_ID = 10**23  # bigger than any database integer column
     "call",
     [
         pytest.param(lambda c, u: upload(c, HUGE_ID), id="upload-huge-user_id"),
-        pytest.param(lambda c, u: c.get(f"/api/ai/receipts/{HUGE_ID}"), id="ai-receipt-huge-id"),
+        # user_id is required, so pass a valid one - otherwise the 422 is for the missing user_id
+        # and the huge transaction ID is never checked.
+        pytest.param(lambda c, u: c.get(f"/api/ai/receipts/{HUGE_ID}", params={"user_id": u}), id="ai-receipt-huge-id"),
         pytest.param(lambda c, u: c.get(f"/api/ai/users/{HUGE_ID}/receipts"), id="ai-receipts-huge-user_id"),
         pytest.param(lambda c, u: c.get(f"/api/ai/users/{u}/receipts", params={"limit": HUGE_ID}), id="ai-receipts-huge-limit"),
     ],

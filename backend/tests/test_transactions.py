@@ -176,6 +176,7 @@ HUGE_ID = 10**23
         pytest.param(lambda c: c.get(f"{BASE}{HUGE_ID}", params={"user_id": 1}), id="get-huge-transaction_id"),
         pytest.param(lambda c: c.get(f"{BASE}user/{HUGE_ID}"), id="list-huge-user_id"),
         pytest.param(lambda c: c.delete(f"{BASE}{HUGE_ID}", params={"user_id": 1}), id="delete-huge-transaction_id"),
+        pytest.param(lambda c: c.put(f"{BASE}{HUGE_ID}", params={"user_id": 1}, json=txn_payload()), id="update-huge-transaction_id"),
     ],
 )
 def test_huge_ids_do_not_crash_the_server(client, user, call):
