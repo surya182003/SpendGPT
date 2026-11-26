@@ -23,3 +23,9 @@ node_modules/
 .vscode/
 .idea/
 database/Bug_Fix-Notebook.ipynb
+# Test coverage output
+.coverage
+htmlcov/
+
+# Local SQLite database created by the backend
+spendgpt.db
