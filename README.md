@@ -142,7 +142,7 @@ pass and can be added to CI.
 The tests use a temporary in-memory database, so they never touch `spendgpt.db` or TiDB. OCR is faked in the
 upload tests, so `indra-ocr` isn't needed.
 
-**Reading the result:** the last line should look like `315 passed, 20 deselected, 23 xfailed`
+**Reading the result:** the last line should look like `447 passed, 28 deselected, 12 xfailed`
 ("deselected" are the live LM Studio tests and the fuzz tests). Each `xfailed` test marks a
 known bug and is expected to fail. When you fix one, its test reports as failing until you delete the
 `@pytest.mark.xfail(...)` line above it, which turns it into a normal test.
