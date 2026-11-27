@@ -202,3 +202,32 @@ class ChatResponse(BaseModel):
     answer: str
     source: Literal["llm", "computed", "fallback"]  # computed = answered directly from the figures
     reason: str | None = None
+
+
+# -- receipt price comparison (BasketWatch) -------------------------------------------
+class PriceComparisonItem(BaseModel):
+    item_name: str
+    quantity: float
+    paid_unit_price: float
+    matched: bool
+    matched_product: str | None = None
+    pack: str | None = None
+    same_store_price: float | None = None  # the online price at the shop the receipt is from
+    cheapest_store: str | None = None
+    cheapest_price: float | None = None
+    possible_saving: float = 0.0
+    prices: dict[str, float] = {}  # online price at each shop that has it
+
+
+class PriceComparisonResponse(BaseModel):
+    transaction_id: int
+    merchant_name: str | None
+    store: str | None  # aldi, tesco, supervalu, dunnes or lidl, None if another shop
+    as_of: str | None  # the day the online prices are from
+    items_total: int
+    items_matched: int
+    matched_paid_total: float
+    matched_cheapest_total: float
+    possible_saving: float
+    items: list[PriceComparisonItem]
+    note: str

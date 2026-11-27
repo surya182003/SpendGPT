@@ -83,3 +83,8 @@ export async function addManualExpense(userId, expense) {
     body: JSON.stringify(expense),
   });
 }
+// Compares each item of a saved receipt with the online prices at Aldi, Tesco,
+// SuperValu, Dunnes and Lidl (BasketWatch). Takes a few seconds.
+export async function comparePrices(userId, transactionId) {
+  return request("/api/ai/receipts/" + transactionId + "/price-comparison?user_id=" + userId);
+}
