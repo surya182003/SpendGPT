@@ -26,3 +26,13 @@ LM_STUDIO_MODEL = os.getenv("LM_STUDIO_MODEL", "")
 LM_STUDIO_API_KEY = os.getenv("LM_STUDIO_API_KEY", "")
 LM_STUDIO_TIMEOUT = float(os.getenv("LM_STUDIO_TIMEOUT", "60"))  # seconds for a full reply
 LM_STUDIO_CONNECT_TIMEOUT = float(os.getenv("LM_STUDIO_CONNECT_TIMEOUT", "5"))
+
+
+# --- BasketWatch (Irish supermarket prices) ------------------------------------
+# BasketWatch is an MCP server with the online prices of Aldi, Tesco, SuperValu,
+# Dunnes and Lidl. We only use its free compare_prices tool, no account needed.
+BASKETWATCH_ENABLED = _env_bool("BASKETWATCH_ENABLED", "true")
+BASKETWATCH_MCP_URL = os.getenv("BASKETWATCH_MCP_URL", "https://basketwatchireland.com/mcp")
+BASKETWATCH_TIMEOUT = float(os.getenv("BASKETWATCH_TIMEOUT", "20"))  # seconds per call
+# most items looked up for one receipt, so a long receipt doesn't spam a free service
+BASKETWATCH_MAX_ITEMS = int(os.getenv("BASKETWATCH_MAX_ITEMS", "15"))

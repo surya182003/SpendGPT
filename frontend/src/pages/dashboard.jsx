@@ -6,6 +6,7 @@ import AdvisorChat from "../components/ai/AdvisorChat";
 import AIStatusBadge from "../components/ai/AIStatusBadge";
 import CategoryPredictor from "../components/ai/CategoryPredictor";
 import InsightsPanel from "../components/ai/InsightsPanel";
+import PriceComparison from "../components/ai/PriceComparison";
 import UnusualSpending from "../components/ai/UnusualSpending";
 import { CHART_COLORS } from "../components/ai/aiStyles.js";
 import {
@@ -92,6 +93,8 @@ function Dashboard() {
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [messageIsError, setMessageIsError] = useState(false);
+  // the receipt that was just scanned, so the Compare prices card can pick it
+  const [lastReceiptId, setLastReceiptId] = useState(null);
 
   
   // the manual expense form (the dropdown above Scan a Receipt)
@@ -148,6 +151,7 @@ function Dashboard() {
     try {
       const receipt = await uploadReceipt(userId, receiptFile);
       handleReceiptRemove();
+      setLastReceiptId(receipt.transaction_id);
       let text = "Receipt saved: " + receipt.merchant_name + " · €" + receipt.total_amount.toFixed(2);
       if (receipt.category_name) {
         text = text + " · Category: " + receipt.category_name;
@@ -418,6 +422,8 @@ function Dashboard() {
           </p>
         )}
       </div>
+
+      <PriceComparison userId={userId} latestReceiptId={lastReceiptId} />
 
       <div
         style={{

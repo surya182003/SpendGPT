@@ -7,6 +7,7 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import config
 from app.database import get_db
 from app.models.alert import Alert
 from app.models.transaction import Transaction
@@ -20,9 +21,16 @@ from app.schemas.ai_schema import (
     ChatResponse,
     InsightsResponse,
     LMStudioStatusResponse,
+    PriceComparisonResponse,
 )
 from app.schemas.receipt_schema import ReceiptOut
 from app.services.anomaly_service import analyse_user, store_alerts
+from app.services.basketwatch_service import (
+    BasketWatchClient,
+    BasketWatchError,
+    compare_receipt,
+    get_basketwatch_client,
+)
 from app.services.categorization_service import categorize_transaction
 from app.services.insights_service import (
     UserNotFoundError,
@@ -106,6 +114,37 @@ def get_user_receipts(
     transactions = db.scalars(statement).all()
 
     return [receipt_to_dict(t) for t in transactions]
+
+
+@router.get("/receipts/{transaction_id}/price-comparison", response_model=PriceComparisonResponse)
+def compare_receipt_prices(
+    transaction_id: Annotated[int, Path(gt=0, le=2_147_483_647)],
+    user_id: Annotated[int, Query(gt=0, le=2_147_483_647)],
+    db: Session = Depends(get_db),
+    basketwatch: BasketWatchClient = Depends(get_basketwatch_client),
+):
+    """Compares what was paid for each item with the supermarkets' online prices."""
+    if not config.BASKETWATCH_ENABLED:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Price comparison is switched off")
+
+    # same check as get_receipt: it has to be this user's uploaded receipt
+    statement = select(Transaction).where(
+        Transaction.transaction_id == transaction_id,
+        Transaction.user_id == user_id,
+        Transaction.receipt_hash.is_not(None)
+    )
+    transaction = db.scalar(statement)
+    if transaction is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Receipt not found")
+
+    try:
+        return compare_receipt(db, transaction, basketwatch)
+    except BasketWatchError as error:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Could not get prices from BasketWatch right now, please try again later",
+        ) from error
 
 
 def _require_user(db: Session, user_id: int) -> User:
